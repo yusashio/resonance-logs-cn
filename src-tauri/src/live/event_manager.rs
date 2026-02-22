@@ -178,9 +178,40 @@ impl EventManager {
         self.app_handle.is_some()
     }
 
-    /// Returns a clone of the app handle for lock-free event emission.
+    /// Returns a clone of app handle for lock-free event emission.
     pub fn get_app_handle(&self) -> Option<AppHandle> {
         self.app_handle.clone()
+    }
+
+    /// Emits an attribute update event.
+    ///
+    /// # Arguments
+    ///
+    /// * `uid` - The UID of the player.
+    /// * `name` - The name of the player.
+    /// * `class_name` - The class name of the player.
+    /// * `level` - The level of the player.
+    /// * `attributes` - The list of attributes.
+    pub fn emit_attribute_update(
+        &self,
+        uid: i64,
+        name: String,
+        class_name: String,
+        level: i32,
+        attributes: Vec<AttributeValue>,
+    ) {
+        if let Some(app_handle) = &self.app_handle {
+            let payload = AttributeUpdatePayload {
+                player_attributes: PlayerAttributes {
+                    uid,
+                    name,
+                    class_name,
+                    level,
+                    attributes,
+                },
+            };
+            safe_emit(app_handle, "attribute-update", payload);
+        }
     }
 }
 
@@ -207,6 +238,54 @@ pub struct BossDeathPayload {
 pub struct SceneChangePayload {
     /// The name of the new scene.
     pub scene_name: String,
+}
+
+/// The payload for an attribute update event
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttributeUpdatePayload {
+    /// Player attributes data
+    pub player_attributes: PlayerAttributes,
+}
+
+/// Player attributes for attribute update event
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlayerAttributes {
+    /// Player UID
+    pub uid: i64,
+    /// Player name
+    pub name: String,
+    /// Player class name
+    pub class_name: String,
+    /// Player level
+    pub level: i32,
+    /// Player attributes list
+    pub attributes: Vec<AttributeValue>,
+}
+
+/// Single attribute value
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttributeValue {
+    /// Attribute ID
+    pub attr_id: i32,
+    /// Attribute name
+    pub attr_name: String,
+    /// Attribute value
+    pub value: AttributeValueEnum,
+    /// Attribute number type (0=fixed, 1=percentage, etc.)
+    pub attr_num_type: i32,
+}
+
+/// Attribute value enum to support different types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum AttributeValueEnum {
+    Int(i64),
+    Float(f64),
+    String(String),
+    Bool(bool),
 }
 
 impl Default for EventManager {

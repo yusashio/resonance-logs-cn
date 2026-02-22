@@ -1141,6 +1141,7 @@ impl AppStateManager {
             &mut state.entity_cache,
             &mut state.playerdata_cache,
             sync_container_data,
+            Some(&mut state.event_manager),
         )
         .is_none()
         {

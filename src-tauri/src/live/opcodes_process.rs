@@ -321,6 +321,7 @@ pub fn process_sync_container_data(
     entity_cache: &mut HashMap<i64, CachedEntity>,
     playerdata_cache: &mut Option<CachedPlayerData>,
     sync_container_data: blueprotobuf::SyncContainerData,
+    event_manager: Option<&mut crate::live::event_manager::EventManager>,
 ) -> Option<()> {
     use crate::live::opcodes_models::{AttrType, AttrValue};
 
@@ -372,7 +373,6 @@ pub fn process_sync_container_data(
     // Only store players in the database
     if matches!(target_entity.entity_type, EEntityType::EntChar) {
         upsert_entity_cache_entry(entity_cache, player_uid, target_entity, name_opt, now_ms());
-
         // Persist detailed player data for the local player.
         let now = now_ms();
 
@@ -385,8 +385,59 @@ pub fn process_sync_container_data(
             vdata_bytes,
             dirty: true,
         });
-    }
 
+        // Emit attribute update event for the local player
+        if let Some(em) = event_manager {
+            log::trace!(
+                "Checking attribute update from SyncContainerData: player_uid={}",
+                player_uid
+            );
+            use crate::live::opcodes_models::class;
+            use crate::live::event_manager::{AttributeValue, AttributeValueEnum};
+            use crate::live::fight_attr;
+
+            let class_name = class::get_class_name(target_entity.class_id);
+            let attributes: Vec<AttributeValue> = target_entity
+                .attributes
+                .iter()
+                .map(|(attr_type, attr_value)| {
+                    let attr_id = attr_type.to_id();
+                    let attr_name = fight_attr::get_attr_name(attr_id)
+                        .unwrap_or_else(|| format!("{:?}", attr_type));
+                    let attr_num_type = fight_attr::get_attr_num_type(attr_id);
+                    let value = match attr_value {
+                        AttrValue::Int(v) => AttributeValueEnum::Int(*v),
+                        AttrValue::Float(v) => AttributeValueEnum::Float(*v),
+                        AttrValue::String(v) => AttributeValueEnum::String(v.clone()),
+                        AttrValue::Bool(v) => AttributeValueEnum::Bool(*v),
+                    };
+                    AttributeValue {
+                        attr_id,
+                        attr_name,
+                        value,
+                        attr_num_type,
+                    }
+                })
+                .collect();
+
+            log::trace!(
+                "Emitting attribute update from SyncContainerData for player {} (uid: {}, class: {}, level: {}, attrs count: {})",
+                target_entity.name,
+                player_uid,
+                class_name,
+                target_entity.level,
+                attributes.len()
+            );
+
+            em.emit_attribute_update(
+                player_uid,
+                target_entity.name.clone(),
+                class_name,
+                target_entity.level,
+                attributes,
+            );
+        }
+    }
     Some(())
 }
 

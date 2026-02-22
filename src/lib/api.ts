@@ -110,6 +110,25 @@ export type BuffUpdatePayload = {
   buffs: BuffUpdateState[];
 };
 
+export type AttributeValue = {
+  attrId: number;
+  attrName: string;
+  value: number | string | boolean;
+  attrNumType: number;
+};
+
+export type PlayerAttributes = {
+  uid: number;
+  name: string;
+  className: string;
+  level: number;
+  attributes: AttributeValue[];
+};
+
+export type AttributeUpdatePayload = {
+  playerAttributes: PlayerAttributes;
+};
+
 export type EncounterUpdatePayload = {
   headerInfo: HeaderInfo;
   isPaused: boolean;
@@ -209,6 +228,14 @@ export const onFightResUpdate = (
 export const onBuffUpdate = (
   handler: (event: Event<BuffUpdatePayload>) => void
 ): Promise<UnlistenFn> => listen<BuffUpdatePayload>("buff-update", handler);
+
+export const onAttributeUpdate = (
+  handler: (event: Event<AttributeUpdatePayload>) => void
+): Promise<UnlistenFn> => listen<AttributeUpdatePayload>("attribute-update", handler);
+
+export const onBuffUpdateAll = (
+  handler: (event: Event<BuffUpdatePayload>) => void
+): Promise<UnlistenFn> => listen<BuffUpdatePayload>("buff-update-all", handler);
 
 // Command wrappers (still using generated bindings)
 

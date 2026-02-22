@@ -5,6 +5,7 @@ pub mod commands_models;
 pub mod dungeon_dirty_blob;
 pub mod dungeon_log;
 pub mod event_manager;
+pub mod fight_attr;
 pub mod live_main;
 pub mod opcodes_models;
 pub mod opcodes_process;

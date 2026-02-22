@@ -43,3 +43,10 @@ specs/
 src-tauri/build_errors.log
 src-tauri/npcap_sdk/
 latest.json
+
+# 测试页面和代码（保留本地但不提交到git）
+src/routes/*-test/
+src/routes/dps-test/
+src/routes/buff-monitor-test/
+src/routes/attr-monitor-test/
+src/routes/fight-res-test/

@@ -47,6 +47,18 @@
                 "visible": false,
                 "resizable": true,
                 "shadow": false
+            },
+            {
+                "title": "Attribute Monitor",
+                "label": "attr-monitor",
+                "url": "attr-monitor",
+                "decorations": false,
+                "transparent": true,
+                "alwaysOnTop": true,
+                "skipTaskbar": true,
+                "width": 320,
+                "height": 200,
+                "visible": false
             }
         ],
         "security": {
