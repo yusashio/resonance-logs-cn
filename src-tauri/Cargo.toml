@@ -23,7 +23,7 @@ cc = "1.0"
 
 [dependencies]
 # image-png for frontend
-tauri = { version = "2.9.3", features = ["tray-icon", "image-png"] }
+tauri = { version = "2.10.1", features = ["tray-icon", "image-png"] }
 serde = { version = "1.0.219", features = ["derive"] }
 tauri-plugin-single-instance = "2.3.4"
 tracing = "0.1"
@@ -74,7 +74,7 @@ path = "./src/blueprotobuf-lib"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2.3.1"
-tauri-plugin-updater = "2"
+tauri-plugin-updater = "2.10.0"
 
 [dev-dependencies]
 rand = "0.9.2"
