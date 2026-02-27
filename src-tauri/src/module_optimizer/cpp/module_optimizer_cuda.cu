@@ -464,16 +464,26 @@ extern "C" int TestCuda()
     int device_count = 0;
     cudaError_t err = cudaGetDeviceCount(&device_count);
 
-    if (err != cudaSuccess || device_count == 0)
+    if (err != cudaSuccess)
     {
+        printf("CUDA: cudaGetDeviceCount failed: %s\n", cudaGetErrorString(err));
         return 0;
     }
+    
+    if (device_count == 0)
+    {
+        printf("CUDA: No CUDA devices found\n");
+        return 0;
+    }
+    
+    printf("CUDA: Found %d device(s)\n", device_count);
 
     int *d_data;
     const int size = 1024;
     err = cudaMalloc(&d_data, size * sizeof(int));
     if (err != cudaSuccess)
     {
+        printf("CUDA: cudaMalloc failed: %s\n", cudaGetErrorString(err));
         return 0;
     }
 
@@ -484,7 +494,14 @@ extern "C" int TestCuda()
     err = cudaDeviceSynchronize();
     cudaFree(d_data);
 
-    return (err == cudaSuccess) ? 1 : 0;
+    if (err != cudaSuccess)
+    {
+        printf("CUDA: kernel execution failed: %s\n", cudaGetErrorString(err));
+        return 0;
+    }
+    
+    printf("CUDA: Test passed, GPU acceleration available\n");
+    return 1;
 }
 
 long long CpuCombinationCount(int n, int r)

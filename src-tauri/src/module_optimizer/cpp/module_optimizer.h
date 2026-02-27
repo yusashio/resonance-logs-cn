@@ -149,43 +149,31 @@ struct LightweightSolution {
 };
 
 /// @brief 更加紧凑的模组解
-/// @details 用于中间计算, 将4个模组的索引打包进64位整数中
+/// @details 用于中间计算, 将5个模组的索引存储在数组中
 struct CompactSolution {
-    /// @brief 打包的模组索引
-    uint64_t packed_indices;
+    /// @brief 模组索引数组
+    std::array<uint16_t, 5> indices;
     
     /// @brief 分数
     int score;
     
     /// @brief 默认构造函数
-    CompactSolution() : packed_indices(0), score(0) {}
+    CompactSolution() : score(0) { indices.fill(0); }
     
     /// @brief 从数组构造
-    /// @param indices 模组索引数组
+    /// @param idx 模组索引数组
     /// @param score 分数
-    CompactSolution(const std::array<uint16_t, 4>& indices, int score) : score(score) {
-        pack_indices_array(indices);
-    }
-    
-    /// @brief 从数组打包索引
-    /// @param indices 模组索引数组
-    void pack_indices_array(const std::array<uint16_t, 4>& indices) {
-        packed_indices = 0;
-        for (size_t i = 0; i < 4; ++i) {
-            packed_indices |= (static_cast<uint64_t>(indices[i]) << (i * 16));
-        }
-    }
+    CompactSolution(const std::array<uint16_t, 5>& idx, int score) : indices(idx), score(score) {}
     
     /// @brief 解包索引
     /// @return 模组索引
     std::vector<size_t> unpack_indices_vector() const {
-        std::vector<size_t> indices;
-        indices.reserve(4);
-        for (size_t i = 0; i < 4; ++i) {
-            uint16_t idx = static_cast<uint16_t>((packed_indices >> (i * 16)) & 0xFFFF);
-            indices.push_back(static_cast<size_t>(idx));
+        std::vector<size_t> idx;
+        idx.reserve(5);
+        for (size_t i = 0; i < 5; ++i) {
+            idx.push_back(static_cast<size_t>(indices[i]));
         }
-        return indices;
+        return idx;
     }
     
     /// @brief 大于比较运算符, 用于排序
@@ -250,13 +238,13 @@ public:
         const std::unordered_set<int>& exclude_attributes = {});
 
     /// @brief 根据紧凑索引计算战斗力
-    /// @param packed_indices 打包的模组索引
+    /// @param compact_solution 紧凑解决方案
     /// @param modules 模组信息列表
     /// @param target_attributes 目标属性名称列表
     /// @param exclude_attributes 排除属性名称列表
     /// @return 返回战斗力数值
-    static int CalculateCombatPowerByPackedIndices(
-        uint64_t packed_indices,
+    static int CalculateCombatPowerByCompactSolution(
+        const CompactSolution& compact_solution,
         const std::vector<ModuleInfo>& modules,
         const std::unordered_set<int>& target_attributes = {},
         const std::unordered_set<int>& exclude_attributes = {}

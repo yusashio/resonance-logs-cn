@@ -88,6 +88,7 @@ export type OverlayPositions = {
   resourceGroup: Point;
   textBuffPanel: Point;
   specialBuffGroup: Point;
+  attrPanel: Point;
   iconBuffPositions: Record<number, Point>;
 };
 
@@ -95,12 +96,25 @@ export type OverlaySizes = {
   skillCdGroupScale: number;
   resourceGroupScale: number;
   textBuffPanelScale: number;
+  attrPanelScale: number;
   iconBuffSizes: Record<number, number>;
 };
 
 export type OverlayVisibility = {
   showSkillCdGroup: boolean;
   showResourceGroup: boolean;
+  showAttrPanel: boolean;
+};
+
+export type AttrMonitorSettings = {
+  enabled: boolean;
+};
+
+export type TestPanelSettings = {
+  attrMonitorTest: boolean;
+  buffMonitorTest: boolean;
+  dpsTest: boolean;
+  fightResTest: boolean;
 };
 
 export type BuffDisplayMode = "individual" | "grouped";
@@ -142,6 +156,7 @@ function createDefaultOverlayPositions(): OverlayPositions {
     resourceGroup: { x: 40, y: 170 },
     textBuffPanel: { x: 360, y: 40 },
     specialBuffGroup: { x: 360, y: 220 },
+    attrPanel: { x: 40, y: 310 },
     iconBuffPositions: {},
   };
 }
@@ -151,6 +166,7 @@ function createDefaultOverlaySizes(): OverlaySizes {
     skillCdGroupScale: 1,
     resourceGroupScale: 1,
     textBuffPanelScale: 1,
+    attrPanelScale: 1,
     iconBuffSizes: {},
   };
 }
@@ -159,6 +175,7 @@ function createDefaultOverlayVisibility(): OverlayVisibility {
   return {
     showSkillCdGroup: true,
     showResourceGroup: true,
+    showAttrPanel: true,
   };
 }
 
@@ -182,6 +199,17 @@ export function createDefaultBuffGroup(
     showLayer: true,
   };
 }
+
+export const DEFAULT_ATTR_MONITOR_SETTINGS: AttrMonitorSettings = {
+  enabled: false,
+};
+
+export const DEFAULT_TEST_PANEL_SETTINGS: TestPanelSettings = {
+  attrMonitorTest: false,
+  buffMonitorTest: false,
+  dpsTest: false,
+  fightResTest: false,
+};
 
 export function createDefaultSkillMonitorProfile(
   name = "默认方案",
@@ -450,8 +478,16 @@ const DEFAULT_SETTINGS = {
   },
   skillMonitor: {
     enabled: false,
+    enableBuff: false,
+    enableTextBuff: false,
     activeProfileIndex: 0,
     profiles: [createDefaultSkillMonitorProfile()] as SkillMonitorProfile[],
+  },
+  attrMonitor: {
+    ...DEFAULT_ATTR_MONITOR_SETTINGS,
+  },
+  testPanel: {
+    ...DEFAULT_TEST_PANEL_SETTINGS,
   },
   live: {
     general: { ...DEFAULT_GENERAL_SETTINGS },
@@ -536,6 +572,16 @@ export const SETTINGS = {
   skillMonitor: new RuneStore(
     'skillMonitor',
     DEFAULT_SETTINGS.skillMonitor,
+    RUNE_STORE_OPTIONS
+  ),
+  attrMonitor: new RuneStore(
+    'attrMonitor',
+    DEFAULT_SETTINGS.attrMonitor,
+    RUNE_STORE_OPTIONS
+  ),
+  testPanel: new RuneStore(
+    'testPanel',
+    DEFAULT_SETTINGS.testPanel,
     RUNE_STORE_OPTIONS
   ),
   live: {
@@ -668,6 +714,7 @@ export const settings = {
     shortcuts: SETTINGS.shortcuts.state,
     moduleSync: SETTINGS.moduleSync.state,
     skillMonitor: SETTINGS.skillMonitor.state,
+    attrMonitor: SETTINGS.attrMonitor.state,
     live: {
       general: SETTINGS.live.general.state,
       dps: {

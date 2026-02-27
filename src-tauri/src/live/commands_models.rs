@@ -251,6 +251,8 @@ pub struct BuffDefinition {
     pub base_id: i32,
     pub name: String,
     pub sprite_file: String,
+    pub talent_name: Option<String>,
+    pub talent_sprite_file: Option<String>,
     pub search_keywords: Vec<String>,
 }
 
@@ -293,4 +295,16 @@ pub struct FightResourceUpdatePayload {
 pub struct ModuleCalcProgressPayload {
     pub processed: u64,
     pub total: u64,
+}
+
+/// 实体血量信息
+#[derive(specta::Type, serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct EntityHealth {
+    pub uid: i64,
+    pub name: String,
+    pub current_hp: Option<i64>,
+    pub max_hp: Option<i64>,
+    pub monster_type_id: Option<i32>,
+    pub entity_type: i32,
 }

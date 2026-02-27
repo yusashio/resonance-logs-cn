@@ -10,11 +10,13 @@
     targetAttributes = $bindable<number[]>([]),
     excludeAttributes = $bindable<number[]>([]),
     minRequirements = $bindable<MinReq[]>([{ attrId: null, value: null }]),
+    minModuleScore = $bindable<number>(0),
   }: {
     attributeOptions: AttrOption[];
     targetAttributes: number[];
     excludeAttributes: number[];
     minRequirements: MinReq[];
+    minModuleScore: number;
   } = $props();
 
   function toggle(list: number[], id: number): number[] {
@@ -78,6 +80,23 @@
           {opt.label}
         </Button>
       {/each}
+    </div>
+  </div>
+
+  <div class="space-y-2">
+    <div class="text-sm text-muted-foreground">最低属性值总和阈值（排除属性值总和低于此值的模组，0表示不限制）</div>
+    <div class="flex items-center gap-2">
+      <Input
+        type="number"
+        min="0"
+        class="w-32"
+        value={minModuleScore}
+        onchange={(e) => {
+          const val = parseNullableNumber((e.target as HTMLInputElement).value);
+          minModuleScore = val ?? 0;
+        }}
+      />
+      <span class="text-sm text-muted-foreground">点</span>
     </div>
   </div>
 

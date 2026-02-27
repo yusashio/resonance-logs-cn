@@ -24,7 +24,13 @@ fn load_latest_char_serialize() -> Result<CharSerialize, String> {
             .select(dpd::vdata_bytes)
             .order(dpd::last_seen_ms.desc())
             .first(conn)
-            .map_err(|e| e.to_string())
+            .map_err(|e| {
+                if e.to_string().contains("NotFound") || e.to_string().contains("record") {
+                    "请先进入游戏场景，等待数据捕获后再刷新".to_string()
+                } else {
+                    e.to_string()
+                }
+            })
     })?;
 
     log::info!(
@@ -35,7 +41,7 @@ fn load_latest_char_serialize() -> Result<CharSerialize, String> {
     if let Some(bytes) = vdata_bytes {
         CharSerialize::decode(bytes.as_slice()).map_err(|e| e.to_string())
     } else {
-        Err("No player data found".to_string())
+        Err("请先进入游戏场景，等待数据捕获后再刷新".to_string())
     }
 }
 
@@ -54,38 +60,47 @@ pub async fn optimize_latest_modules(
     exclude_attributes: Vec<i32>,
     min_attr_requirements: Option<HashMap<i32, i32>>,
     use_gpu: Option<bool>,
+    min_module_score: Option<i32>,
 ) -> Result<Vec<ModuleSolution>, String> {
     log::info!(
-        "收到优化请求: target={:?}, exclude={:?}, min_req={:?}, gpu={:?}",
+        "收到优化请求: target={:?}, exclude={:?}, min_req={:?}, gpu={:?}, min_score={:?}",
         target_attributes,
         exclude_attributes,
         min_attr_requirements,
-        use_gpu
+        use_gpu,
+        min_module_score
     );
 
     let vdata = load_latest_char_serialize()?;
-    let all_modules = parse_modules_from_vdata(&vdata);
-    let original_count = all_modules.len();
+    let mut modules = parse_modules_from_vdata(&vdata);
 
-    let modules = if !target_attributes.is_empty() {
-        let target_set: std::collections::HashSet<i32> = target_attributes.iter().cloned().collect();
-        all_modules
+    // 过滤低属性值总和的模组
+    let min_score = min_module_score.unwrap_or(0);
+    if min_score > 0 {
+        let before_count = modules.len();
+        modules = modules
             .into_iter()
-            .filter(|m| m.parts.iter().any(|p| target_set.contains(&p.id)))
-            .collect()
-    } else {
-        all_modules
-    };
+            .filter(|m| {
+                let total: i32 = m.parts.iter().map(|p| p.value).sum();
+                total >= min_score
+            })
+            .collect();
+        log::info!(
+            "按属性值总和过滤: {} -> {} (阈值: {})",
+            before_count,
+            modules.len(),
+            min_score
+        );
+    }
 
     log::info!(
-        "模组预筛: {} -> {} (target_attrs: {:?})",
-        original_count,
+        "模组数量: {} (target_attrs: {:?})",
         modules.len(),
         target_attributes
     );
 
-    if modules.len() < 4 {
-        return Err("需要至少 4 个模组".to_string());
+    if modules.len() < 5 {
+        return Err("需要至少 5 个模组".to_string());
     }
 
     let max_workers = std::thread::available_parallelism()
@@ -129,11 +144,7 @@ pub async fn optimize_latest_modules(
     .await
     .map_err(|e| e.to_string())?;
 
-    let mut result: Vec<ModuleSolution> = result.into_iter().take(10).collect();
-
-    for solution in &mut result {
-        solution.score = super::calculate_combat_power(&solution.modules);
-    }
+    let result: Vec<ModuleSolution> = result.into_iter().take(10).collect();
 
     let _ = app.emit("module-calc-complete", &result);
 
@@ -150,8 +161,8 @@ pub fn greedy_optimize_modules(
     max_attempts_multiplier: Option<i32>,
     local_search_iterations: Option<i32>,
 ) -> Result<Vec<ModuleSolution>, String> {
-    if modules.len() < 4 {
-        return Err("需要至少 4 个模组".to_string());
+    if modules.len() < 5 {
+        return Err("需要至少 5 个模组".to_string());
     }
 
     let result = optimize_modules(

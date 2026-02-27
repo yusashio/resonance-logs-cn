@@ -5,6 +5,7 @@
   import ExternalLinkIcon from "virtual:icons/lucide/external-link";
   import PlayIcon from "virtual:icons/lucide/play";
   import PenSquareIcon from "virtual:icons/lucide/pen-square";
+  import { SETTINGS } from "$lib/settings-store";
 
   let { children } = $props();
 
@@ -33,6 +34,12 @@
     try {
       const overlayWindow = await WebviewWindow.getByLabel("game-overlay");
       if (overlayWindow !== null) {
+        const isVisible = await overlayWindow.isVisible();
+        if (!isVisible) {
+          await overlayWindow.show();
+          await overlayWindow.unminimize();
+          await overlayWindow.setFocus();
+        }
         await emit("overlay-edit-toggle");
       } else {
         console.warn("Game overlay window not found");

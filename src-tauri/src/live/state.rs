@@ -1049,6 +1049,7 @@ impl AppStateManager {
             &mut state.encounter,
             &mut state.entity_cache,
             sync_near_entities,
+            Some(&mut state.event_manager),
         )
         .is_none()
         {
@@ -1362,6 +1363,7 @@ impl AppStateManager {
             &mut state.entity_cache,
             sync_to_me_delta_info,
             dungeon_ctx.as_ref(),
+            Some(&mut state.event_manager),
         );
 
         if let Some(raw_bytes) = buff_effect_bytes {
@@ -1460,6 +1462,7 @@ impl AppStateManager {
         }
 
         let dungeon_ctx = dungeon_runtime_if_enabled(state);
+        let mut event_manager = Some(&mut state.event_manager);
         for aoi_sync_delta in sync_near_delta_info.delta_infos {
             // Missing fields are normal, no need to log
             let _ = process_aoi_sync_delta(
@@ -1467,6 +1470,7 @@ impl AppStateManager {
                 &mut state.entity_cache,
                 aoi_sync_delta,
                 dungeon_ctx.as_ref(),
+                event_manager.as_mut().map(|em| &mut **em),
             );
         }
     }

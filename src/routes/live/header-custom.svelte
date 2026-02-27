@@ -53,8 +53,8 @@
       type: activeSegment.segmentType,
       label:
         activeSegment.segmentType === "boss"
-          ? (activeSegment.bossName ?? "Boss Segment")
-          : "Trash Segment",
+          ? (activeSegment.bossName ?? "boss阶段")
+          : "小怪阶段",
     };
   });
 

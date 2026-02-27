@@ -31,6 +31,7 @@
             <td class="px-3 py-2">{sol.score}</td>
             <td class="px-3 py-2 whitespace-pre-wrap">
               {Object.entries(sol.attr_breakdown)
+                .sort((a, b) => b[1] - a[1])
                 .map(([k, v]) => `${k}+${v}`)
                 .join(", ")}
             </td>

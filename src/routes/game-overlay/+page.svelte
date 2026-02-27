@@ -25,6 +25,7 @@
     findSkillDerivationBySource,
     findSpecialBuffDisplays,
   } from "$lib/skill-mappings";
+  import AttrPanel from "./components/AttrPanel.svelte";
 
   type SkillDisplay = {
     isActive: boolean;
@@ -91,17 +92,20 @@
     resourceGroup: { x: 40, y: 170 },
     textBuffPanel: { x: 360, y: 40 },
     specialBuffGroup: { x: 360, y: 220 },
+    attrPanel: { x: 40, y: 310 },
     iconBuffPositions: {},
   };
   const DEFAULT_OVERLAY_SIZES: OverlaySizes = {
     skillCdGroupScale: 1,
     resourceGroupScale: 1,
     textBuffPanelScale: 1,
+    attrPanelScale: 1,
     iconBuffSizes: {},
   };
   const DEFAULT_OVERLAY_VISIBILITY: OverlayVisibility = {
     showSkillCdGroup: true,
     showResourceGroup: true,
+    showAttrPanel: true,
   };
 
   let cdMap = $state(new Map<number, SkillCdState>());
@@ -141,6 +145,8 @@
   const textBuffMaxVisible = $derived(
     Math.max(1, Math.min(20, activeProfile?.textBuffMaxVisible ?? 10)),
   );
+  const attrPanelBuffIds = $derived([2302421, 2110057]);
+  const allMonitoredBuffIds = $derived([...new Set([...monitoredBuffIds, ...attrPanelBuffIds])]);
   const normalizedBuffGroups = $derived.by(() => {
     if (!activeProfile) return [];
     return ensureBuffGroups(activeProfile);
@@ -149,9 +155,14 @@
     if (!activeProfile) return null;
     return ensureIndividualMonitorAllGroup(activeProfile);
   });
-  const overlayVisibility = $derived(
-    activeProfile?.overlayVisibility ?? DEFAULT_OVERLAY_VISIBILITY,
-  );
+  const overlayVisibility = $derived.by(() => {
+    if (!activeProfile) return DEFAULT_OVERLAY_VISIBILITY;
+    const baseVisibility = ensureOverlayVisibility(activeProfile);
+    return {
+      ...baseVisibility,
+      showAttrPanel: baseVisibility.showAttrPanel && SETTINGS.attrMonitor.state.enabled,
+    };
+  });
   const specialBuffConfigMap = $derived.by(() => {
     const map = new Map<number, SpecialBuffDisplay>();
     for (const config of findSpecialBuffDisplays(selectedClassKey)) {
@@ -167,6 +178,7 @@
       resourceGroup: current?.resourceGroup ?? DEFAULT_OVERLAY_POSITIONS.resourceGroup,
       textBuffPanel: current?.textBuffPanel ?? DEFAULT_OVERLAY_POSITIONS.textBuffPanel,
       specialBuffGroup: current?.specialBuffGroup ?? DEFAULT_OVERLAY_POSITIONS.specialBuffGroup,
+      attrPanel: current?.attrPanel ?? DEFAULT_OVERLAY_POSITIONS.attrPanel,
       iconBuffPositions: current?.iconBuffPositions ?? {},
     };
   }
@@ -180,6 +192,8 @@
         current?.resourceGroupScale ?? DEFAULT_OVERLAY_SIZES.resourceGroupScale,
       textBuffPanelScale:
         current?.textBuffPanelScale ?? DEFAULT_OVERLAY_SIZES.textBuffPanelScale,
+      attrPanelScale:
+        current?.attrPanelScale ?? DEFAULT_OVERLAY_SIZES.attrPanelScale,
       iconBuffSizes: current?.iconBuffSizes ?? {},
     };
   }
@@ -191,6 +205,8 @@
         current?.showSkillCdGroup ?? DEFAULT_OVERLAY_VISIBILITY.showSkillCdGroup,
       showResourceGroup:
         current?.showResourceGroup ?? DEFAULT_OVERLAY_VISIBILITY.showResourceGroup,
+      showAttrPanel:
+        current?.showAttrPanel ?? DEFAULT_OVERLAY_VISIBILITY.showAttrPanel,
     };
   }
 
@@ -567,9 +583,14 @@
   }
 
   $effect(() => {
-    const ids = monitoredBuffIds;
+    const ids = allMonitoredBuffIds;
     if (ids.length === 0) return;
     void loadBuffNames(ids);
+  });
+
+  $effect(() => {
+    const ids = allMonitoredBuffIds;
+    void commands.setMonitoredBuffs(ids);
   });
 
   const groupedIconBuffs = $derived.by(() => {
@@ -599,7 +620,7 @@
   const individualModeIconBuffs = $derived.by(() => {
     if (buffDisplayMode !== "individual") return [];
     if (!individualMonitorAllGroup) return iconDisplayBuffs;
-    const selected = new Set(monitoredBuffIds);
+    const selected = new Set(allMonitoredBuffIds);
     return iconDisplayBuffs.filter(
       (buff) => selected.has(buff.baseId) || !!(buff.specialImages && buff.specialImages.length > 0),
     );
@@ -607,7 +628,7 @@
 
   const individualAllGroupBuffs = $derived.by(() => {
     if (buffDisplayMode !== "individual" || !individualMonitorAllGroup) return [];
-    const selected = new Set(monitoredBuffIds);
+    const selected = new Set(allMonitoredBuffIds);
     return iconDisplayBuffs.filter(
       (buff) => !selected.has(buff.baseId) && !(buff.specialImages && buff.specialImages.length > 0),
     );
@@ -682,7 +703,7 @@
     if (isEditing) {
       const iconIds = new Set(nextIconBuffs.map((buff) => buff.baseId));
       const textIds = new Set(nextTextBuffs.map((buff) => buff.baseId));
-      for (const baseId of monitoredBuffIds) {
+      for (const baseId of allMonitoredBuffIds) {
         if (iconIds.has(baseId) || textIds.has(baseId)) continue;
         const def = buffDefinitions.get(baseId);
         const name = def?.name ?? buffNameMap.get(baseId) ?? `#${baseId}`;
@@ -803,7 +824,7 @@
     });
 
     // Preload names for monitored ids so edit mode can show non-active buffs.
-    void loadBuffNames(monitoredBuffIds);
+    void loadBuffNames(allMonitoredBuffIds);
 
     window.addEventListener("pointermove", onGlobalPointerMove);
     window.addEventListener("pointerup", onGlobalPointerUp);
@@ -964,7 +985,41 @@
     </div>
   {/if}
 
-  {#if limitedTextBuffs.length > 0}
+  {#if overlayVisibility.showAttrPanel}
+    <div
+      class="overlay-group attr-panel-group"
+      class:editable={isEditing}
+      style:left={`${getGroupPosition("attrPanel").x}px`}
+      style:top={`${getGroupPosition("attrPanel").y}px`}
+      style:transform={`scale(${getGroupScale("attrPanelScale")})`}
+      style:transform-origin="top left"
+      onpointerdown={(e) => startDrag(e, { kind: "group", key: "attrPanel" }, getGroupPosition("attrPanel"))}
+    >
+      {#if isEditing}
+        <div class="group-tag">属性面板</div>
+      {/if}
+      <AttrPanel
+        className={selectedClassKey}
+        editable={isEditing}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+        }}
+        onResizeStart={(e) => {
+          e.stopPropagation();
+          startResize(e, { kind: "group", key: "attrPanelScale" }, getGroupScale("attrPanelScale"));
+        }}
+      />
+      {#if isEditing}
+        <div
+          class="resize-handle"
+          onpointerdown={(e) =>
+            startResize(e, { kind: "group", key: "attrPanelScale" }, getGroupScale("attrPanelScale"))}
+        ></div>
+      {/if}
+    </div>
+  {/if}
+
+  {#if SETTINGS.skillMonitor.state.enableTextBuff && limitedTextBuffs.length > 0}
     <div
       class="overlay-group text-buff-panel"
       class:editable={isEditing}
@@ -1297,6 +1352,7 @@
 
   .skill-group.editable,
   .resource-group.editable,
+  .attr-panel-group.editable,
   .text-buff-panel.editable {
     border: 2px solid rgba(102, 204, 255, 0.9);
     border-radius: 10px;

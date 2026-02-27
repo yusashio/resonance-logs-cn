@@ -15,12 +15,13 @@ use tokio::sync::RwLock;
 ///
 /// Returns `true` if the event was emitted successfully, `false` otherwise.
 fn safe_emit<S: Serialize + Clone>(app_handle: &AppHandle, event: &str, payload: S) -> bool {
-    // First check if the live window exists and is valid
+    // First check if any window exists and is valid
     let live_window = app_handle.get_webview_window(crate::WINDOW_LIVE_LABEL);
     let main_window = app_handle.get_webview_window(crate::WINDOW_MAIN_LABEL);
+    let game_overlay_window = app_handle.get_webview_window(crate::WINDOW_GAME_OVERLAY_LABEL);
 
     // If no windows are available, skip emitting
-    if live_window.is_none() && main_window.is_none() {
+    if live_window.is_none() && main_window.is_none() && game_overlay_window.is_none() {
         trace!("Skipping emit for '{}': no windows available", event);
         return false;
     }

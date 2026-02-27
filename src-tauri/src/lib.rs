@@ -29,8 +29,6 @@ pub const WINDOW_LIVE_LABEL: &str = "live";
 pub const WINDOW_MAIN_LABEL: &str = "main";
 /// The label for the unified game overlay window.
 pub const WINDOW_GAME_OVERLAY_LABEL: &str = "game-overlay";
-/// The label for the attribute monitor window.
-pub const WINDOW_ATTR_MONITOR_LABEL: &str = "attr-monitor";
 
 /// Keeps the non-blocking tracing appender worker alive for the lifetime of the process.
 /// If this guard is dropped, file logging may stop flushing.
@@ -66,6 +64,7 @@ pub fn run() {
             live::commands::search_buffs_by_name,
             live::commands::set_monitor_all_buff,
             live::commands::set_buff_priority,
+            live::commands::get_entity_health,
             database::commands::get_recent_encounters,
             database::commands::get_unique_scene_names,
             database::commands::get_unique_boss_names,

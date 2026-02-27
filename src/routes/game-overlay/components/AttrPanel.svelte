@@ -1,9 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { onAttributeUpdate, type AttributeUpdatePayload } from "$lib/api";
-  import { onBuffUpdateAll, type BuffUpdatePayload, type BuffUpdateState } from "$lib/api";
-  import { getCurrentWindow, PhysicalSize } from "@tauri-apps/api/window";
+  import { onBuffUpdate, type BuffUpdatePayload, type BuffUpdateState } from "$lib/api";
   import type { Event } from "@tauri-apps/api/event";
+  import classAttributes from "$lib/config/class-attributes.json";
 
   type AttributeDisplay = {
     attrId: number;
@@ -30,16 +30,17 @@
     11340: "魔法攻击",
   };
 
-  const CLASS_NAME_TO_ATTR_MAP: Record<string, { primaryAttr: { attrId: number; attrName: string }; attackAttr: { attrId: number; attrName: string } }> = {
-    "雷影剑士": { primaryAttr: { attrId: 11010, attrName: "力量" }, attackAttr: { attrId: 11330, attrName: "物理攻击" } },
-    "冰魔导师": { primaryAttr: { attrId: 11020, attrName: "智力" }, attackAttr: { attrId: 11340, attrName: "魔法攻击" } },
-    "青岚骑士": { primaryAttr: { attrId: 11030, attrName: "敏捷" }, attackAttr: { attrId: 11330, attrName: "物理攻击" } },
-    "森语者": { primaryAttr: { attrId: 11020, attrName: "智力" }, attackAttr: { attrId: 11340, attrName: "魔法攻击" } },
-    "巨刃守护者": { primaryAttr: { attrId: 11010, attrName: "力量" }, attackAttr: { attrId: 11330, attrName: "物理攻击" } },
-    "神射手": { primaryAttr: { attrId: 11030, attrName: "敏捷" }, attackAttr: { attrId: 11330, attrName: "物理攻击" } },
-    "神盾骑士": { primaryAttr: { attrId: 11010, attrName: "力量" }, attackAttr: { attrId: 11330, attrName: "物理攻击" } },
-    "灵魂乐手": { primaryAttr: { attrId: 11020, attrName: "智力" }, attackAttr: { attrId: 11340, attrName: "魔法攻击" } },
-  };
+  const CLASS_NAME_TO_ATTR_MAP: Record<string, { primaryAttr: { attrId: number; attrName: string }; attackAttr: { attrId: number; attrName: string } }> = classAttributes as any;
+
+  let { 
+    editable = false, 
+    onPointerDown, 
+    onResizeStart 
+  } = $props<{
+    editable?: boolean;
+    onPointerDown: (e: PointerEvent) => void;
+    onResizeStart: (e: PointerEvent) => void;
+  }>();
 
   function getDefaultAttributes(): AttributeDisplay[] {
     return DISPLAY_ATTR_IDS.map(attrId => ({
@@ -81,7 +82,6 @@
   let classAttr = $state<AttributeDisplay>(getDefaultClassAttr());
   let attackAttr = $state<AttributeDisplay>(getDefaultAttackAttr());
   let noReviveBuffActive = $state<boolean>(false);
-  let noReviveBuffData = $state<BuffUpdateState | null>(null);
 
   function updateDisplay(payload: AttributeUpdatePayload) {
     const { playerAttributes: attrs } = payload;
@@ -200,6 +200,11 @@
     
     if (lifeFluctuationBuff) {
       lifeFluctuationBuffData = lifeFluctuationBuff;
+      const now = Date.now();
+      const end = lifeFluctuationBuff.createTimeMs + lifeFluctuationBuff.durationMs;
+      const remaining = Math.max(0, end - now);
+      const remainingSeconds = (remaining / 1000).toFixed(1);
+      lifeFluctuationBuffValue = `${remainingSeconds}s`;
       if (!rafId) {
         updateBuffTimer();
       }
@@ -210,18 +215,16 @@
     
     if (noReviveBuff) {
       noReviveBuffActive = true;
-      noReviveBuffData = noReviveBuff;
     } else {
       noReviveBuffActive = false;
-      noReviveBuffData = null;
     }
   }
 
   function updateBuffTimer() {
     if (lifeFluctuationBuffData) {
       const now = Date.now();
-      const elapsed = now - lifeFluctuationBuffData.receivedAt;
-      const remaining = Math.max(0, lifeFluctuationBuffData.durationMs - elapsed);
+      const end = lifeFluctuationBuffData.createTimeMs + lifeFluctuationBuffData.durationMs;
+      const remaining = Math.max(0, end - now);
       const remainingSeconds = (remaining / 1000).toFixed(1);
       
       lifeFluctuationBuffValue = `${remainingSeconds}s`;
@@ -255,35 +258,11 @@
   }
 
   onMount(() => {
-    if (typeof document !== "undefined") {
-      document.documentElement.style.setProperty(
-        "background",
-        "transparent",
-        "important",
-      );
-      document.body.style.setProperty(
-        "background",
-        "transparent",
-        "important",
-      );
-    }
-
-    void (async () => {
-      try {
-        const win = getCurrentWindow();
-        const size = await win.innerSize();
-        await win.setSize(new PhysicalSize(size.width + 1, size.height + 1));
-        await win.setSize(new PhysicalSize(size.width, size.height));
-      } catch (error) {
-        console.warn("[attr-monitor] resize hack failed", error);
-      }
-    })();
-
     const unlistenAttr = onAttributeUpdate((event) => {
       updateDisplay(event.payload);
     });
 
-    const unlistenBuff = onBuffUpdateAll((event) => {
+    const unlistenBuff = onBuffUpdate((event) => {
       updateBuffDisplay(event);
     });
 
@@ -298,7 +277,11 @@
   });
 </script>
 
-<div class="attr-monitor-root" data-tauri-drag-region>
+<div
+  class="attr-monitor-root"
+  class:editable={editable}
+  on:pointerdown={onPointerDown}
+>
   <div class="attributes-list">
     <div class="attr-row class-attr">
       <div class="attr-name">{classAttr.attrName}</div>
@@ -315,34 +298,50 @@
       </div>
     {/each}
     {#if lifeFluctuationBuffValue}
-      <div class="attr-row">
+      <div class="attr-row" class:life-fluctuation={lifeFluctuationBuffValue !== "未激活"}>
         <div class="attr-name">生命波动</div>
         <div class="attr-value">{lifeFluctuationBuffValue}</div>
       </div>
     {/if}
     {#if noReviveBuffActive}
       <div class="attr-row no-revive-buff">
-        <div class="attr-name">状态</div>
-        <div class="attr-value">禁止复活</div>
+        <div class="attr-name">复活</div>
+        <div class="attr-value">禁止</div>
+      </div>
+    {:else}
+      <div class="attr-row">
+        <div class="attr-name">复活</div>
+        <div class="attr-value">正常</div>
       </div>
     {/if}
   </div>
 </div>
 
+{#if editable}
+  <div
+    class="resize-handle"
+    on:pointerdown={onResizeStart}
+  ></div>
+{/if}
+
 <style>
   .attr-monitor-root {
     display: flex;
     flex-direction: column;
-    width: 100vw;
-    height: 100vh;
-    box-sizing: border-box;
-    padding: 8px;
     border-radius: 8px;
-    background: rgba(0, 0, 0, 0.7);
     user-select: none;
-    gap: 8px;
+    gap: 4px;
     overflow: hidden;
-    app-region: drag;
+  }
+
+  .attr-monitor-root:not(.editable) {
+    background: rgba(0, 0, 0, 0.7);
+    padding: 8px;
+  }
+
+  .attr-monitor-root.editable {
+    background: transparent;
+    padding: 0;
   }
 
   .attributes-list {
@@ -359,7 +358,6 @@
 
   .attributes-list::-webkit-scrollbar {
     width: 6px;
-    app-region: no-drag;
   }
 
   .attributes-list::-webkit-scrollbar-track {
@@ -467,15 +465,43 @@
     text-shadow: 0 0 4px rgba(244, 67, 54, 0.8);
   }
 
-  :global(html),
-  :global(body) {
-    background: transparent !important;
-    width: 100%;
-    height: 100%;
-    margin: 0;
+  .attr-row.life-fluctuation {
+    background: rgba(33, 150, 243, 0.2);
+    border: 1px solid rgba(33, 150, 243, 0.5);
   }
 
-  :global(body) {
-    overflow: hidden;
+  .attr-row.life-fluctuation .attr-name,
+  .attr-row.life-fluctuation .attr-value {
+    color: rgba(33, 150, 243, 0.8);
+    font-weight: 600;
+    text-shadow: 0 0 4px rgb(35, 160, 250);
+  }
+
+  .resize-handle {
+    position: absolute;
+    right: -10px;
+    bottom: -10px;
+    width: 20px;
+    height: 20px;
+    cursor: nwse-resize;
+    pointer-events: auto;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+  }
+
+  .resize-handle:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .resize-handle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 10px;
+    height: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    border-radius: 50%;
   }
 </style>

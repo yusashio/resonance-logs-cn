@@ -73,6 +73,11 @@ export type SkillRow = {
   hitsPerMinute: number
 };
 
+export type SkillsWindow = {
+  currPlayer: PlayerRow[];
+  skillRows: SkillRow[]
+};
+
 export type SkillCdState = {
   skillLevelId: number;
   beginTime: number;
@@ -104,6 +109,7 @@ export type BuffUpdateState = {
   durationMs: number;
   createTimeMs: number;
   sourceConfigId: number;
+  receivedAt: number;
 };
 
 export type BuffUpdatePayload = {
@@ -193,12 +199,56 @@ export type DungeonLog = {
   segments: Segment[];
 };
 
+export type EntityHealth = {
+  uid: number;
+  name: string;
+  currentHp: number | null;
+  maxHp: number | null;
+  monsterTypeId: number | null;
+  entityType: number;
+};
+
+export type DungeonReviveInfo = {
+  reviveIds: number[];
+  reviveMap: Record<number, number>;
+};
+
+export type DungeonReviveUpdatePayload = {
+  reviveInfo: DungeonReviveInfo;
+};
+
+export const getEntityHealth = (): Promise<EntityHealth[]> =>
+  invoke("get_entity_health");
+
+export type MetricType = "dps" | "heal" | "tanked";
+
+export type PlayersUpdatePayload = {
+  metricType: MetricType;
+  playersWindow: PlayersWindow;
+};
+
+export type SkillsUpdatePayload = {
+  metricType: MetricType;
+  playerUid: number;
+  skillsWindow: SkillsWindow;
+};
+
+export type PlayerMetricsResetPayload = {
+  segmentName?: string | null;
+};
+
 // Event listener functions
 export const onEncounterUpdate = (handler: (event: Event<EncounterUpdatePayload>) => void): Promise<UnlistenFn> =>
   listen<EncounterUpdatePayload>("encounter-update", handler);
 
 export const onLiveData = (handler: (event: Event<LiveDataPayload>) => void): Promise<UnlistenFn> =>
   listen<LiveDataPayload>("live-data", handler);
+
+export const onPlayersUpdate = (handler: (event: Event<PlayersUpdatePayload>) => void): Promise<UnlistenFn> =>
+  listen<PlayersUpdatePayload>("players-update", handler);
+
+export const onSkillsUpdate = (handler: (event: Event<SkillsUpdatePayload>) => void): Promise<UnlistenFn> =>
+  listen<SkillsUpdatePayload>("skills-update", handler);
 
 export const onBossDeath = (handler: (event: Event<BossDeathPayload>) => void): Promise<UnlistenFn> =>
   listen<BossDeathPayload>("boss-death", handler);
@@ -209,8 +259,23 @@ export const onSceneChange = (handler: (event: Event<SceneChangePayload>) => voi
 export const onDungeonLogUpdate = (handler: (event: Event<DungeonLog>) => void): Promise<UnlistenFn> =>
   listen<DungeonLog>("log-update", handler);
 
+// Convenience: factory to create metric-filtered listeners
+export const makeSkillsUpdateFilter =
+  (metric: MetricType) =>
+    (handler: (event: Event<SkillsUpdatePayload>) => void): Promise<UnlistenFn> =>
+      listen<SkillsUpdatePayload>("skills-update", (event) => {
+        if (event.payload.metricType === metric) handler(event);
+      });
+
+export const onDpsSkillsUpdate = makeSkillsUpdateFilter("dps");
+export const onHealSkillsUpdate = makeSkillsUpdateFilter("heal");
+export const onTankedSkillsUpdate = makeSkillsUpdateFilter("tanked");
+
 export const onResetEncounter = (handler: () => void): Promise<UnlistenFn> =>
   listen("reset-encounter", handler);
+
+export const onResetPlayerMetrics = (handler: (event: Event<PlayerMetricsResetPayload>) => void): Promise<UnlistenFn> =>
+  listen<PlayerMetricsResetPayload>("reset-player-metrics", handler);
 
 export const onPauseEncounter = (handler: (event: Event<boolean>) => void): Promise<UnlistenFn> =>
   listen<boolean>("pause-encounter", handler);
@@ -237,10 +302,15 @@ export const onBuffUpdateAll = (
   handler: (event: Event<BuffUpdatePayload>) => void
 ): Promise<UnlistenFn> => listen<BuffUpdatePayload>("buff-update-all", handler);
 
+export const onDungeonReviveInfoUpdate = (
+  handler: (event: Event<DungeonReviveInfo>) => void
+): Promise<UnlistenFn> => listen<DungeonReviveInfo>("dungeon-revive-info-update", handler);
+
 // Command wrappers (still using generated bindings)
 
 export const resetEncounter = (): Promise<Result<null, string>> => commands.resetEncounter();
 export const togglePauseEncounter = (): Promise<Result<null, string>> => commands.togglePauseEncounter();
+export const resetPlayerMetrics = (): Promise<Result<null, string>> => commands.resetPlayerMetrics();
 export const enableBlur = (): Promise<void> => commands.enableBlur();
 export const disableBlur = (): Promise<void> => commands.disableBlur();
 export const getEncounterEntitiesRaw = (
@@ -251,13 +321,19 @@ export const getEncounterEntitiesRaw = (
 // New: toggle boss-only DPS filtering on the backend
 export const setBossOnlyDps = (enabled: boolean): Promise<void> => invoke("set_boss_only_dps", { enabled });
 
-// export const setDungeonSegmentsEnabled = (enabled: boolean): Promise<void> =>
-//   invoke("set_dungeon_segments_enabled", { enabled });
+export const setDungeonSegmentsEnabled = (enabled: boolean): Promise<void> =>
+  invoke("set_dungeon_segments_enabled", { enabled });
+
+export const setWipeDetectionEnabled = (enabled: boolean): Promise<void> =>
+  invoke("set_wipe_detection_enabled", { enabled });
 
 export const setEventUpdateRateMs = (rateMs: number): Promise<void> =>
   invoke("set_event_update_rate_ms", { rateMs });
 
 export const getDungeonLog = (): Promise<DungeonLog> => invoke("get_dungeon_log");
+
+export const getEncounterSegments = (encounterId: number): Promise<Segment[]> =>
+  invoke("get_encounter_segments", { encounterId });
 
 // =========================
 // 模组计算器相关 API
@@ -288,6 +364,7 @@ export type OptimizeLatestPayload = {
   excludeAttributes: number[];
   minAttrRequirements?: Record<number, number>;
   useGpu?: boolean;
+  minModuleScore?: number;
 };
 
 export type ModuleCalcProgressPayload = [number, number]; // [processed, total]
