@@ -159,6 +159,17 @@ async getAvailableBuffs() : Promise<Result<BuffDefinition[], string>> {
 }
 },
 /**
+ * Returns all buffs (including those without sprites).
+ */
+async getAllBuffs() : Promise<Result<BuffDefinition[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_all_buffs") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Returns display names for requested buff ids, including buffs without sprite images.
  */
 async getBuffNames(baseIds: number[]) : Promise<Result<BuffNameInfo[], string>> {

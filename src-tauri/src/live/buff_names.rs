@@ -147,6 +147,23 @@ pub fn get_buffs_with_sprites() -> Vec<BuffSpriteEntry> {
     result
 }
 
+/// Returns all buffs (including those without sprites).
+pub fn get_all_buffs() -> Vec<BuffSpriteEntry> {
+    let cache = BUFF_CACHE.read();
+    let mut result: Vec<BuffSpriteEntry> = cache
+        .iter()
+        .map(|(id, entry)| BuffSpriteEntry {
+            base_id: *id,
+            name: entry.name.clone(),
+            sprite_file: entry.sprite_file.clone().unwrap_or_default(),
+            talent_name: entry.talent_name.clone(),
+            talent_sprite_file: entry.talent_sprite_file.clone(),
+        })
+        .collect();
+    result.sort_by_key(|entry| entry.base_id);
+    result
+}
+
 /// Searches buffs by name and returns matching base ids.
 pub fn search_buffs_by_name(keyword: &str, limit: usize) -> Vec<(i32, BuffNameEntry)> {
     let needle = keyword.trim().to_lowercase();

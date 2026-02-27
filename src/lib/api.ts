@@ -10,10 +10,10 @@ import type {
   Result,
   RawCombatStats as BindingRawCombatStats,
   RawSkillStats as BindingRawSkillStats,
-  RawEntityData as BindingRawEntityData,
+  HistoryEntityData as BindingHistoryEntityData,
 } from "./bindings";
 
-// Type definitions for event payloads
+export type RawEntityData = BindingHistoryEntityData;
 export type BossHealth = {
   uid: number;
   name: string;
@@ -109,7 +109,6 @@ export type BuffUpdateState = {
   durationMs: number;
   createTimeMs: number;
   sourceConfigId: number;
-  receivedAt: number;
 };
 
 export type BuffUpdatePayload = {
@@ -217,8 +216,8 @@ export type DungeonReviveUpdatePayload = {
   reviveInfo: DungeonReviveInfo;
 };
 
-export const getEntityHealth = (): Promise<EntityHealth[]> =>
-  invoke("get_entity_health");
+export const getEntityHealth = (): Promise<Result<EntityHealth[], string>> =>
+  commands.getEntityHealth();
 
 export type MetricType = "dps" | "heal" | "tanked";
 
@@ -319,21 +318,17 @@ export const getEncounterEntitiesRaw = (
   commands.getEncounterEntitiesRaw(encounterId);
 
 // New: toggle boss-only DPS filtering on the backend
-export const setBossOnlyDps = (enabled: boolean): Promise<void> => invoke("set_boss_only_dps", { enabled });
+export const setBossOnlyDps = (enabled: boolean): Promise<Result<null, string>> =>
+  commands.setBossOnlyDps(enabled);
 
-export const setDungeonSegmentsEnabled = (enabled: boolean): Promise<void> =>
-  invoke("set_dungeon_segments_enabled", { enabled });
+export const setDungeonSegmentsEnabled = (enabled: boolean): Promise<Result<null, string>> =>
+  commands.setDungeonSegmentsEnabled(enabled);
 
-export const setWipeDetectionEnabled = (enabled: boolean): Promise<void> =>
-  invoke("set_wipe_detection_enabled", { enabled });
+export const setEventUpdateRateMs = (rateMs: number): Promise<Result<null, string>> =>
+  commands.setEventUpdateRateMs(rateMs);
 
-export const setEventUpdateRateMs = (rateMs: number): Promise<void> =>
-  invoke("set_event_update_rate_ms", { rateMs });
-
-export const getDungeonLog = (): Promise<DungeonLog> => invoke("get_dungeon_log");
-
-export const getEncounterSegments = (encounterId: number): Promise<Segment[]> =>
-  invoke("get_encounter_segments", { encounterId });
+export const getDungeonLog = (): Promise<Result<DungeonLog, string>> =>
+  commands.getDungeonLog();
 
 // =========================
 // 模组计算器相关 API

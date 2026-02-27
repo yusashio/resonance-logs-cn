@@ -1,7 +1,9 @@
 <script lang="ts">
-  import { getActiveProfile, updateActiveProfile } from "$lib/profile-store";
-  import { ensureBuffGroups, addBuffGroup, removeBuffGroup, updateBuffGroup } from "$lib/buff-group-store";
-  import { toggleBuffInGroup, togglePriorityInGroup, moveGroupPriority, setGroupSearchKeyword, setGroupPrioritySearchKeyword, getGroupSearchKeyword, getGroupPrioritySearchKeyword, getGroupSearchResults, getGroupPrioritySearchResults, getGroupPriorityIds } from "$lib/buff-utils";
+  import { getActiveProfile, updateActiveProfile } from "../lib/profile-store";
+  import { ensureBuffGroups, addBuffGroup, removeBuffGroup, updateBuffGroup } from "../lib/buff-group-store";
+  import { toggleBuffInGroup, togglePriorityInGroup, moveGroupPriority, uniqueIds } from "../lib/buff-utils";
+  import { commands } from "$lib/bindings";
+  import type { BuffDefinition, BuffNameInfo } from "$lib/bindings";
 
   let {
     onUpdateProfile,
@@ -12,7 +14,51 @@
   const activeProfile = $derived.by(() => getActiveProfile());
 
   const buffDisplayMode = $derived.by(() => activeProfile.buffDisplayMode ?? "individual");
-  const buffGroups = $derived.by(() => ensureBuffGroups(activeProfile));
+  const buffGroups = $derived.by(() => ensureBuffGroups(activeProfile.buffGroups));
+
+  let availableBuffs = $state<BuffDefinition[]>([]);
+  let buffNames = $state(new Map<number, BuffNameInfo>());
+  let groupSearchKeywords = $state<Record<string, string>>({});
+  let groupSearchResults = $state<Record<string, BuffNameInfo[]>>({});
+  let groupPrioritySearchKeywords = $state<Record<string, string>>({});
+  let groupPrioritySearchResults = $state<Record<string, BuffNameInfo[]>>({});
+
+  const availableBuffMap = $derived.by(() => {
+    const map = new Map<number, BuffDefinition>();
+    for (const buff of availableBuffs) {
+      map.set(buff.baseId, buff);
+    }
+    return map;
+  });
+
+  $effect(() => {
+    void (async () => {
+      const res = await commands.getAvailableBuffs();
+      if (res.status === "ok") {
+        availableBuffs = res.data;
+      }
+    })();
+  });
+
+  $effect(() => {
+    const allBuffIds = new Set<number>();
+    for (const group of buffGroups) {
+      for (const id of group.buffIds) allBuffIds.add(id);
+      for (const id of group.priorityBuffIds) allBuffIds.add(id);
+    }
+    if (allBuffIds.size === 0) return;
+    void (async () => {
+      const missing = Array.from(allBuffIds).filter((id) => !buffNames.has(id));
+      if (missing.length === 0) return;
+      const res = await commands.getBuffNames(missing);
+      if (res.status !== "ok") return;
+      const next = new Map(buffNames);
+      for (const item of res.data) {
+        next.set(item.baseId, item);
+      }
+      buffNames = next;
+    })();
+  });
 
   function addBuffGroupAction(): void {
     updateActiveProfile((profile) => ({
@@ -90,32 +136,56 @@
     }));
   }
 
-  function setGroupSearchKeywordAction(groupId: string, value: string): void {
-    setGroupSearchKeyword(groupId, value);
+  async function setGroupSearchKeywordAction(groupId: string, value: string): Promise<void> {
+    groupSearchKeywords = { ...groupSearchKeywords, [groupId]: value };
+    if (value.trim()) {
+      const res = await commands.searchBuffsByName(value, 120);
+      if (res.status === "ok") {
+        groupSearchResults = { ...groupSearchResults, [groupId]: res.data };
+      }
+    } else {
+      groupSearchResults = { ...groupSearchResults, [groupId]: [] };
+    }
   }
 
-  function setGroupPrioritySearchKeywordAction(groupId: string, value: string): void {
-    setGroupPrioritySearchKeyword(groupId, value);
+  async function setGroupPrioritySearchKeywordAction(groupId: string, value: string): Promise<void> {
+    groupPrioritySearchKeywords = { ...groupPrioritySearchKeywords, [groupId]: value };
+    if (value.trim()) {
+      const res = await commands.searchBuffsByName(value, 120);
+      if (res.status === "ok") {
+        groupPrioritySearchResults = { ...groupPrioritySearchResults, [groupId]: res.data };
+      }
+    } else {
+      groupPrioritySearchResults = { ...groupPrioritySearchResults, [groupId]: [] };
+    }
   }
 
   function getGroupSearchKeywordAction(groupId: string): string {
-    return getGroupSearchKeyword(groupId);
+    return groupSearchKeywords[groupId] ?? "";
   }
 
   function getGroupPrioritySearchKeywordAction(groupId: string): string {
-    return getGroupPrioritySearchKeyword(groupId);
+    return groupPrioritySearchKeywords[groupId] ?? "";
   }
 
-  function getGroupSearchResultsAction(group: any): any[] {
-    return getGroupSearchResults(group, []);
+  function getGroupSearchResultsAction(group: any): BuffNameInfo[] {
+    const results = groupSearchResults[group.id] ?? [];
+    const existingIds = new Set(group.buffIds);
+    return results.filter((item) => !existingIds.has(item.baseId));
   }
 
-  function getGroupPrioritySearchResultsAction(group: any): any[] {
-    return getGroupPrioritySearchResults(group, []);
+  function getGroupPrioritySearchResultsAction(group: any): BuffNameInfo[] {
+    const results = groupPrioritySearchResults[group.id] ?? [];
+    const existingIds = new Set(group.priorityBuffIds);
+    if (!group.monitorAll) {
+      const inGroup = new Set(group.buffIds);
+      return results.filter((item) => inGroup.has(item.baseId) && !existingIds.has(item.baseId));
+    }
+    return results.filter((item) => !existingIds.has(item.baseId));
   }
 
   function getGroupPriorityIdsAction(group: any): number[] {
-    return getGroupPriorityIds(group);
+    return uniqueIds(group.priorityBuffIds ?? []);
   }
 </script>
 

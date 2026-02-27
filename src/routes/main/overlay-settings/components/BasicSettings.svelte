@@ -78,11 +78,6 @@
         description="实时推送技能CD数据到悬浮窗口"
       />
       <SettingsSwitch
-        bind:checked={SETTINGS.skillMonitor.state.enableBuff}
-        label="Buff监控"
-        description="实时推送Buff数据到悬浮窗口"
-      />
-      <SettingsSwitch
         checked={showResourceGroup}
         onchange={(e) => {
           const enabled = (e.currentTarget as HTMLInputElement).checked;
@@ -90,6 +85,16 @@
         }}
         label="资源监控"
         description="实时推送战斗资源数据到悬浮窗口"
+      />
+      <SettingsSwitch
+        bind:checked={SETTINGS.skillMonitor.state.enableBuff}
+        label="图标Buff"
+        description="实时推送图标Buff数据到悬浮窗口"
+      />
+      <SettingsSwitch
+        bind:checked={SETTINGS.skillMonitor.state.enableTextBuff}
+        label="文字Buff"
+        description="实时推送文字Buff数据到悬浮窗口"
       />
       <SettingsSwitch
         bind:checked={SETTINGS.attrMonitor.state.enabled}

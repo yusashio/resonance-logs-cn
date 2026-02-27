@@ -215,7 +215,7 @@
             <span
               class="font-bold text-foreground tabular-nums tracking-tight leading-none"
               style="font-size: {h.timerFontSize}px"
-              {@attach tooltip(() => "Time Elapsed")}
+              {@attach tooltip(() => "当前战斗时间")}
               >{formatElapsed(displayElapsedMs)}</span
             >
           </div>
@@ -258,7 +258,7 @@
             class="text-muted-foreground hover:text-foreground hover:bg-popover/60 rounded-lg transition-all duration-200"
             style="padding: {h.resetButtonPadding}px"
             onclick={handleResetEncounter}
-            {@attach tooltip(() => "Reset Encounter")}
+            {@attach tooltip(() => "重置当前战斗")}
           >
             <RefreshCwIcon
               style="width: {h.resetButtonSize}px; height: {h.resetButtonSize}px"
@@ -330,7 +330,7 @@
               <span
                 class="font-bold text-muted-foreground uppercase tracking-wider"
                 style="font-size: {h.totalDamageLabelFontSize}px"
-                {@attach tooltip(() => "Total Damage Dealt")}>T.DMG</span
+                {@attach tooltip(() => "造成的总伤害")}>T.DMG</span
               >
               <span
                 class="font-bold text-foreground"
@@ -350,7 +350,7 @@
               <span
                 class="font-bold text-muted-foreground uppercase tracking-wider"
                 style="font-size: {h.totalDpsLabelFontSize}px"
-                {@attach tooltip(() => "Total Damage per Second")}>T.DPS</span
+                {@attach tooltip(() => "每秒总伤害")}>T.DPS</span
               >
               <span
                 class="font-bold text-foreground"
@@ -368,7 +368,7 @@
             <span
               class="font-bold text-muted-foreground uppercase tracking-wider"
               style="font-size: {h.bossHealthLabelFontSize}px"
-              {@attach tooltip(() => "Boss Health")}>BOSS</span
+              {@attach tooltip(() => "当前boss血量")}>BOSS</span
             >
             <!-- Inline Boss Health Display -->
             {#if displayBosses.length > 0}

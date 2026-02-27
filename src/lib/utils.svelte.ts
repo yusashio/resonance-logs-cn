@@ -13,14 +13,14 @@ import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { SETTINGS, DEFAULT_CLASS_COLORS, DEFAULT_CLASS_SPEC_COLORS, CLASS_SPEC_MAP } from '$lib/settings-store';
 
 export const CLASS_MAP: Record<number, string> = {
-  1: 'Stormblade',
-  2: 'Frost Mage',
-  4: 'Wind Knight',
-  5: 'Verdant Oracle',
-  9: 'Heavy Guardian',
-  11: 'Marksman',
-  12: 'Shield Knight',
-  13: 'Beat Performer'
+  1: '雷影剑士',
+  2: '冰魔导师',
+  4: '青岚骑士',
+  5: '森语者',
+  9: '巨刃守护者',
+  11: '神射手',
+  12: '神盾骑士',
+  13: '灵魂乐手'
 };
 
 export const CLASS_NAMES = Object.values(CLASS_MAP);

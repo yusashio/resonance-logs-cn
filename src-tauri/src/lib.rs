@@ -60,6 +60,7 @@ pub fn run() {
             live::commands::set_monitored_skills,
             live::commands::set_monitored_buffs,
             live::commands::get_available_buffs,
+            live::commands::get_all_buffs,
             live::commands::get_buff_names,
             live::commands::search_buffs_by_name,
             live::commands::set_monitor_all_buff,

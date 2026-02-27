@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { getActiveProfile, updateActiveProfile } from "$lib/profile-store";
-  import { ensureIndividualMonitorAllGroup, ensureBuffGroups, addIndividualMonitorAll, removeIndividualMonitorAll, updateIndividualMonitorAllGroup } from "$lib/buff-group-store";
-  import { toggleBuffInGroup, togglePriorityInGroup, moveGroupPriority, setGroupSearchKeyword, setGroupPrioritySearchKeyword, getGroupSearchKeyword, getGroupPrioritySearchKeyword, getGroupSearchResults, getGroupPrioritySearchResults, getGroupPriorityIds, uniqueIds } from "$lib/buff-utils";
+  import { getActiveProfile, updateActiveProfile } from "../lib/profile-store";
+  import { ensureBuffGroups, addIndividualMonitorAll, removeIndividualMonitorAll, updateIndividualMonitorAllGroup } from "../lib/buff-group-store";
+  import { ensureIndividualMonitorAllGroup } from "../lib/group-utils";
+  import { toggleBuffInGroup, togglePriorityInGroup, moveGroupPriority, setGroupSearchKeyword, setGroupPrioritySearchKeyword, getGroupSearchKeyword, getGroupPrioritySearchKeyword, getGroupSearchResults, getGroupPrioritySearchResults, getGroupPriorityIds, uniqueIds } from "../lib/buff-utils";
   import { commands } from "$lib/bindings";
   import type { BuffDefinition, BuffNameInfo } from "$lib/bindings";
 
@@ -14,7 +15,7 @@
   const activeProfile = $derived.by(() => getActiveProfile());
 
   const buffDisplayMode = $derived.by(() => activeProfile.buffDisplayMode ?? "individual");
-  const buffGroups = $derived.by(() => ensureBuffGroups(activeProfile));
+  const buffGroups = $derived.by(() => ensureBuffGroups(activeProfile.buffGroups));
   const individualMonitorAllGroup = $derived.by(() => ensureIndividualMonitorAllGroup(activeProfile.individualMonitorAllGroup));
 
   let availableBuffs = $state<BuffDefinition[]>([]);

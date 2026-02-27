@@ -1,5 +1,5 @@
 {
-  "Stormblade": {
+  "雷影剑士": {
     "primaryAttr": {
       "attrId": 11010,
       "attrName": "力量"
@@ -9,7 +9,7 @@
       "attrName": "物理攻击"
     }
   },
-  "Shield Knight": {
+  "神盾骑士": {
     "primaryAttr": {
       "attrId": 11010,
       "attrName": "力量"
@@ -19,7 +19,7 @@
       "attrName": "物理攻击"
     }
   },
-  "Heavy Guardian": {
+  "巨刃守护者": {
     "primaryAttr": {
       "attrId": 11010,
       "attrName": "力量"
@@ -29,7 +29,7 @@
       "attrName": "物理攻击"
     }
   },
-  "Wind Knight": {
+  "青岚骑士": {
     "primaryAttr": {
       "attrId": 11030,
       "attrName": "敏捷"
@@ -39,7 +39,7 @@
       "attrName": "物理攻击"
     }
   },
-  "Marksman": {
+  "神射手": {
     "primaryAttr": {
       "attrId": 11030,
       "attrName": "敏捷"
@@ -49,7 +49,7 @@
       "attrName": "物理攻击"
     }
   },
-  "Frost Mage": {
+  "冰魔导师": {
     "primaryAttr": {
       "attrId": 11020,
       "attrName": "智力"
@@ -59,7 +59,7 @@
       "attrName": "魔法攻击"
     }
   },
-  "Verdant Oracle": {
+  "森语者": {
     "primaryAttr": {
       "attrId": 11020,
       "attrName": "智力"
@@ -69,7 +69,7 @@
       "attrName": "魔法攻击"
     }
   },
-  "Beat Performer": {
+  "灵魂乐手": {
     "primaryAttr": {
       "attrId": 11020,
       "attrName": "智力"

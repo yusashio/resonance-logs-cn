@@ -534,14 +534,14 @@ pub mod class {
 
     pub fn get_class_name(id: i32) -> String {
         String::from(match id {
-            STORMBLADE => "Stormblade",
-            FROST_MAGE => "Frost Mage",
-            WIND_KNIGHT => "Wind Knight",
-            VERDANT_ORACLE => "Verdant Oracle",
-            HEAVY_GUARDIAN => "Heavy Guardian",
-            MARKSMAN => "Marksman",
-            SHIELD_KNIGHT => "Shield Knight",
-            BEAT_PERFORMER => "Beat Performer",
+            STORMBLADE => "雷影剑士",
+            FROST_MAGE => "冰魔导师",
+            WIND_KNIGHT => "青岚骑士",
+            VERDANT_ORACLE => "森语者",
+            HEAVY_GUARDIAN => "巨刃守护者",
+            MARKSMAN => "神射手",
+            SHIELD_KNIGHT => "神盾骑士",
+            BEAT_PERFORMER => "灵魂乐手",
             _ => "", // empty string for unknown
         })
     }
@@ -631,22 +631,22 @@ pub mod class {
     pub fn get_class_spec(class_spec: ClassSpec) -> String {
         String::from(match class_spec {
             ClassSpec::Unknown => "",
-            ClassSpec::Iaido => "Iaido",
-            ClassSpec::Moonstrike => "Moonstrike",
-            ClassSpec::Icicle => "Icicle",
-            ClassSpec::Frostbeam => "Frostbeam",
-            ClassSpec::Vanguard => "Vanguard",
-            ClassSpec::Skyward => "Skyward",
-            ClassSpec::Smite => "Smite",
-            ClassSpec::Lifebind => "Lifebind",
-            ClassSpec::Earthfort => "Earthfort",
-            ClassSpec::Block => "Block",
-            ClassSpec::Wildpack => "Wildpack",
-            ClassSpec::Falconry => "Falconry",
-            ClassSpec::Recovery => "Recovery",
-            ClassSpec::Shield => "Shield",
-            ClassSpec::Dissonance => "Dissonance",
-            ClassSpec::Concerto => "Concerto",
+            ClassSpec::Iaido => "居合",
+            ClassSpec::Moonstrike => "月刃",
+            ClassSpec::Icicle => "冰矛",
+            ClassSpec::Frostbeam => "射线",
+            ClassSpec::Vanguard => "重装",
+            ClassSpec::Skyward => "空枪",
+            ClassSpec::Smite => "惩击",
+            ClassSpec::Lifebind => "愈合",
+            ClassSpec::Earthfort => "岩盾",
+            ClassSpec::Block => "格挡",
+            ClassSpec::Wildpack => "狼弓",
+            ClassSpec::Falconry => "鹰弓",
+            ClassSpec::Recovery => "防盾",
+            ClassSpec::Shield => "光盾",
+            ClassSpec::Dissonance => "狂音",
+            ClassSpec::Concerto => "协奏",
         })
     }
 }

@@ -6,6 +6,8 @@
   import type { BuffDefinition, BuffNameInfo } from "$lib/bindings";
   import SettingsSwitch from "../../dps/settings/settings-switch.svelte";
   import { SETTINGS } from "$lib/settings-store";
+  import BuffGroupManager from "./BuffGroupManager.svelte";
+  import IndividualMonitorAll from "./IndividualMonitorAll.svelte";
 
   const activeProfile = $derived.by(() => getActiveProfile());
 
@@ -272,6 +274,12 @@
         </div>
       </div>
     </div>
+  {/if}
+
+  {#if buffDisplayMode === "grouped"}
+    <BuffGroupManager />
+  {:else}
+    <IndividualMonitorAll />
   {/if}
 
   <div class="rounded-lg border border-border/60 bg-card/40 p-4 space-y-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.02)]">

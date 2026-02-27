@@ -1,6 +1,6 @@
 /**
- * @file This file contains the settings store for the application.
- * It uses `@tauri-store/svelte` to create persistent stores for user settings.
+ * @file 此文件包含应用程序的设置存储。
+ * 使用 `@tauri-store/svelte` 创建用户设置的持久化存储。
  */
 import { RuneStore } from '@tauri-store/svelte';
 
@@ -58,7 +58,7 @@ export const DEFAULT_HISTORY_HEAL_STATS = {
   hitsPerMinute: false,
 };
 
-// Default column order for live tables (keys from column-data.ts)
+// 实时表格的默认列顺序（键来自 column-data.ts）
 export const DEFAULT_DPS_PLAYER_COLUMN_ORDER = ['totalDmg', 'dps', 'tdps', 'bossDmg', 'bossDps', 'dmgPct', 'critRate', 'critDmgRate', 'luckyRate', 'luckyDmgRate', 'hits', 'hitsPerMinute'];
 export const DEFAULT_DPS_SKILL_COLUMN_ORDER = ['totalDmg', 'dps', 'dmgPct', 'critRate', 'critDmgRate', 'luckyRate', 'luckyDmgRate', 'hits', 'hitsPerMinute'];
 export const DEFAULT_HEAL_PLAYER_COLUMN_ORDER = ['totalDmg', 'dps', 'dmgPct', 'critRate', 'critDmgRate', 'luckyRate', 'luckyDmgRate', 'hits', 'hitsPerMinute'];
@@ -66,7 +66,7 @@ export const DEFAULT_HEAL_SKILL_COLUMN_ORDER = ['totalDmg', 'dps', 'dmgPct', 'cr
 export const DEFAULT_TANKED_PLAYER_COLUMN_ORDER = ['totalDmg', 'dps', 'dmgPct', 'critRate', 'critDmgRate', 'luckyRate', 'luckyDmgRate', 'hits', 'hitsPerMinute'];
 export const DEFAULT_TANKED_SKILL_COLUMN_ORDER = ['totalDmg', 'dps', 'dmgPct', 'critRate', 'critDmgRate', 'luckyRate', 'luckyDmgRate', 'hits', 'hitsPerMinute'];
 
-// Default sort settings for live tables
+// 实时表格的默认排序设置
 export const DEFAULT_LIVE_SORT_SETTINGS = {
   dpsPlayers: { sortKey: 'totalDmg', sortDesc: true },
   dpsSkills: { sortKey: 'totalDmg', sortDesc: true },
@@ -251,73 +251,73 @@ const DEFAULT_GENERAL_SETTINGS = {
 };
 
 export const DEFAULT_CLASS_COLORS: Record<string, string> = {
-  "Stormblade": "#674598",
-  "Frost Mage": "#4de3d1",
-  "Wind Knight": "#0099c6",
-  "Verdant Oracle": "#66aa00",
-  "Heavy Guardian": "#b38915",
-  "Marksman": "#ffee00",
-  "Shield Knight": "#7b9aa2",
-  "Beat Performer": "#ee2e48",
+  "雷影剑士": "#674598",
+  "冰魔导师": "#4de3d1",
+  "青岚骑士": "#0099c6",
+  "森语者": "#66aa00",
+  "巨刃守护者": "#b38915",
+  "神射手": "#ffee00",
+  "神盾骑士": "#7b9aa2",
+  "灵魂乐手": "#ee2e48",
 };
 
 export const CLASS_SPEC_MAP: Record<string, string> = {
-  "Iaido": "Stormblade", "Moonstrike": "Stormblade",
-  "Icicle": "Frost Mage", "Frostbeam": "Frost Mage",
-  "Vanguard": "Wind Knight", "Skyward": "Wind Knight",
-  "Smite": "Verdant Oracle", "Lifebind": "Verdant Oracle",
-  "Earthfort": "Heavy Guardian", "Block": "Heavy Guardian",
-  "Wildpack": "Marksman", "Falconry": "Marksman",
-  "Recovery": "Shield Knight", "Shield": "Shield Knight",
-  "Dissonance": "Beat Performer", "Concerto": "Beat Performer",
+  "居合": "雷影剑士", "月刃": "Stormblade",
+  "冰矛": "冰魔导师", "射线": "Frost Mage",
+  "重装": "青岚骑士", "空枪": "Wind Knight",
+  "惩击": "森语者", "愈合": "Verdant Oracle",
+  "岩盾": "巨刃守护者", "格挡": "Heavy Guardian",
+  "狼弓": "神射手", "鹰弓": "Marksman",
+  "防盾": "神盾骑士", "光盾": "Shield Knight",
+  "狂音": "灵魂乐手", "协奏": "Beat Performer",
 };
 
 export const CLASS_SPEC_NAMES = Object.keys(CLASS_SPEC_MAP);
 
 export const DEFAULT_CLASS_SPEC_COLORS: Record<string, string> = {
   // Stormblade
-  "Iaido": "#9b6cf0", "Moonstrike": "#4a2f80",
+  "居合": "#9b6cf0", "月刃": "#4a2f80",
   // Frost Mage
-  "Icicle": "#8ff7ee", "Frostbeam": "#2fbfb3",
+  "冰矛": "#8ff7ee", "射线": "#2fbfb3",
   // Wind Knight
-  "Vanguard": "#4ddff6", "Skyward": "#006b8f",
+  "重装": "#4ddff6", "空枪": "#006b8f",
   // Verdant Oracle
-  "Smite": "#b9f36e", "Lifebind": "#3b6d00",
+  "惩击": "#b9f36e", "愈合": "#3b6d00",
   // Heavy Guardian
-  "Earthfort": "#e6c25a", "Block": "#7b5b08",
+  "岩盾": "#e6c25a", "格挡": "#7b5b08",
   // Marksman
-  "Wildpack": "#fff9a6", "Falconry": "#cab400",
+  "狼弓": "#fff9a6", "鹰弓": "#cab400",
   // Shield Knight
-  "Recovery": "#b6d1d6", "Shield": "#4f6b70",
+  "防盾": "#b6d1d6", "光盾": "#4f6b70",
   // Beat Performer
-  "Dissonance": "#ff7b94", "Concerto": "#9f1322",
+  "狂音": "#ff7b94", "协奏": "#9f1322",
 };
 
 export const DEFAULT_FONT_SIZES = {
-  xs: 10,    // Extra small - labels, hints (default 0.625rem = 10px)
-  sm: 12,    // Small - secondary text (default 0.75rem = 12px)
-  base: 14,  // Base - default text (default 0.875rem = 14px)
-  lg: 16,    // Large - emphasis (default 1rem = 16px)
-  xl: 20,    // Extra large - titles (default 1.25rem = 20px)
+  xs: 10,    // 超小 - 标签、提示（默认 0.625rem = 10px）
+  sm: 12,    // 小 - 次要文本（默认 0.75rem = 12px）
+  base: 14,  // 标准 - 默认文本（默认 0.875rem = 14px）
+  lg: 16,    // 大 - 强调（默认 1rem = 16px）
+  xl: 20,    // 超大 - 标题（默认 1.25rem = 20px）
 };
 
-// Live table customization defaults
+// 实时表格自定义默认值
 export const DEFAULT_LIVE_TABLE_SETTINGS = {
-  // Player row settings
+  // 玩家行设置
   playerRowHeight: 28,
   playerFontSize: 13,
   playerIconSize: 20,
 
-  // Table header settings
+  // 表头设置
   showTableHeader: true,
   tableHeaderHeight: 24,
   tableHeaderFontSize: 11,
   tableHeaderTextColor: "#a1a1aa",
 
-  // Abbreviated numbers (K, M, %)
+  // 缩写数字（K、M、%）
   abbreviatedFontSize: 10,
 
-  // Skill row settings (separate from player rows)
+  // 技能行设置（与玩家行分开）
   skillRowHeight: 24,
   skillFontSize: 12,
   skillIconSize: 18,
@@ -328,25 +328,25 @@ export const DEFAULT_LIVE_TABLE_SETTINGS = {
   skillHeaderTextColor: "#a1a1aa",
   skillAbbreviatedFontSize: 9,
 
-  // Skill-specific row glow / highlight customization (separate from player rows)
+  // 技能特定行发光/高亮自定义（与玩家行分开）
   skillRowGlowMode: 'gradient-underline' as 'gradient-underline' | 'gradient' | 'solid',
   skillRowGlowOpacity: 0.15,
   skillRowBorderRadius: 0,
-  // Row glow / highlight customization
-  // modes: 'gradient-underline' (gradient + neon underline), 'gradient' (gradient only), 'solid' (solid color fill)
+  // 行发光/高亮自定义
+  // 模式：'gradient-underline'（渐变+霓虹下划线）、'gradient'（仅渐变）、'solid'（纯色填充）
   rowGlowMode: 'gradient-underline' as 'gradient-underline' | 'gradient' | 'solid',
-  // opacity applied to the fill (0-1)
+  // 应用于填充的不透明度（0-1）
   rowGlowOpacity: 0.15,
-  // border height in pixels for the neon underline effect
+  // 霓虹下划线效果的边框高度（像素）
   rowGlowBorderHeight: 2,
-  // box-shadow spread/blur for the neon border
+  // 霓虹边框的 box-shadow 扩散/模糊
   rowGlowSpread: 8,
-  // Note: glow always uses the detected class/spec color.
-  // Row border customization
+  // 注意：发光始终使用检测到的职业/专精颜色。
+  // 行边框自定义
   rowBorderRadius: 0,
 };
 
-// (Header preset constants removed - header defaults inlined into DEFAULT_SETTINGS)
+//（表头预设常量已移除 - 表头默认值已内联到 DEFAULT_SETTINGS 中）
 
 export const FONT_SIZE_LABELS: Record<string, string> = {
   xs: '超小',
@@ -356,7 +356,7 @@ export const FONT_SIZE_LABELS: Record<string, string> = {
   xl: '超大',
 };
 
-// Default custom theme colors (based on dark theme)
+// 默认自定义主题颜色（基于深色主题）
 export type CustomThemeColors = {
   backgroundMain: string;
   backgroundLive: string;
@@ -407,7 +407,7 @@ export const DEFAULT_CUSTOM_THEME_COLORS: CustomThemeColors = {
   tableAbbreviatedColor: '#71717a',
 };
 
-// Labels for custom theme color variables
+// 自定义主题颜色变量的标签
 export const CUSTOM_THEME_COLOR_LABELS: Record<string, { label: string; description: string; category: string }> = {
   backgroundMain: { label: '背景（主窗口）', description: '主窗口背景颜色', category: 'Base' },
   backgroundLive: { label: '背景（实时）', description: '实时统计窗口背景颜色', category: 'Base' },
@@ -442,12 +442,12 @@ const DEFAULT_SETTINGS = {
     classSpecColors: { ...DEFAULT_CLASS_SPEC_COLORS },
     fontSizes: { ...DEFAULT_FONT_SIZES },
     customThemeColors: { ...DEFAULT_CUSTOM_THEME_COLORS },
-    // Background image settings
+    // 背景图片设置
     backgroundImage: '' as string,
     backgroundImageEnabled: false,
     backgroundImageMode: 'cover' as 'cover' | 'contain',
     backgroundImageContainColor: 'rgba(0, 0, 0, 1)',
-    // Custom font settings
+    // 自定义字体设置
     customFontSansEnabled: false,
     customFontSansUrl: '' as string,
     customFontSansName: '' as string,
@@ -551,7 +551,7 @@ const DEFAULT_SETTINGS = {
   },
 };
 
-// We need flattened settings for every update to be able to auto-detect new changes
+// 我们需要扁平化的设置，以便每次更新都能自动检测新变化
 const RUNE_STORE_OPTIONS = { autoStart: true, saveOnChange: true };
 export const SETTINGS = {
   accessibility: new RuneStore(
@@ -636,7 +636,7 @@ export const SETTINGS = {
       DEFAULT_SETTINGS.live.headerCustomization,
       RUNE_STORE_OPTIONS
     ),
-    // Column order settings
+    // 列顺序设置
     columnOrder: {
       dpsPlayers: new RuneStore('liveDpsPlayersColumnOrder', { order: DEFAULT_DPS_PLAYER_COLUMN_ORDER }, RUNE_STORE_OPTIONS),
       dpsSkills: new RuneStore('liveDpsSkillsColumnOrder', { order: DEFAULT_DPS_SKILL_COLUMN_ORDER }, RUNE_STORE_OPTIONS),
@@ -645,7 +645,7 @@ export const SETTINGS = {
       tankedPlayers: new RuneStore('liveTankedPlayersColumnOrder', { order: DEFAULT_TANKED_PLAYER_COLUMN_ORDER }, RUNE_STORE_OPTIONS),
       tankedSkills: new RuneStore('liveTankedSkillsColumnOrder', { order: DEFAULT_TANKED_SKILL_COLUMN_ORDER }, RUNE_STORE_OPTIONS),
     },
-    // Sort settings
+    // 排序设置
     sorting: {
       dpsPlayers: new RuneStore('liveDpsPlayersSorting', DEFAULT_LIVE_SORT_SETTINGS.dpsPlayers, RUNE_STORE_OPTIONS),
       dpsSkills: new RuneStore('liveDpsSkillsSorting', DEFAULT_LIVE_SORT_SETTINGS.dpsSkills, RUNE_STORE_OPTIONS),
@@ -698,7 +698,7 @@ export const SETTINGS = {
       ),
     },
   },
-  // persisted app metadata (tracks which app version the user last saw)
+  // 持久化的应用元数据（跟踪用户上次看到的应用版本）
   appVersion: new RuneStore('appVersion', { value: '' }, RUNE_STORE_OPTIONS),
   packetCapture: new RuneStore(
     'packetCapture',
@@ -707,7 +707,7 @@ export const SETTINGS = {
   ),
 };
 
-// Create flattened settings object for backwards compatibility
+// 创建扁平化的设置对象以保持向后兼容性
 export const settings = {
   state: {
     accessibility: SETTINGS.accessibility.state,
@@ -767,6 +767,6 @@ export const settings = {
   },
 };
 
-// Accessibility helpers
+// 无障碍辅助功能
 
-// Theme selection removed — app uses only the `custom` theme controlled by customThemeColors
+// 主题选择已移除 — 应用仅使用由 customThemeColors 控制的 `custom` 主题

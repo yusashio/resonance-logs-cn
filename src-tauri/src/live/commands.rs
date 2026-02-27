@@ -215,6 +215,32 @@ pub async fn get_available_buffs(
     Ok(buffs)
 }
 
+/// Returns all buffs (including those without sprites).
+#[tauri::command]
+#[specta::specta]
+pub async fn get_all_buffs(
+    _state_manager: tauri::State<'_, AppStateManager>,
+) -> Result<Vec<crate::live::commands_models::BuffDefinition>, String> {
+    use crate::live::buff_names;
+    use crate::live::commands_models::BuffDefinition;
+
+    let buffs = buff_names::get_all_buffs()
+        .into_iter()
+        .map(|entry| {
+            let search_keywords = vec![entry.name.clone()];
+            BuffDefinition {
+                base_id: entry.base_id,
+                name: entry.name,
+                sprite_file: entry.sprite_file,
+                talent_name: entry.talent_name,
+                talent_sprite_file: entry.talent_sprite_file,
+                search_keywords,
+            }
+        })
+        .collect();
+    Ok(buffs)
+}
+
 /// Returns display names for requested buff ids, including buffs without sprite images.
 #[tauri::command]
 #[specta::specta]

@@ -57,8 +57,7 @@
         <SwordsIcon class="w-5 h-5" />
       </div>
       <div>
-        <h1 class="text-xl font-bold text-foreground">技能监控</h1>
-        <p class="text-sm text-muted-foreground">自定义监控技能CD与战斗资源</p>
+        <h1 class="text-xl font-bold text-foreground">overlay设置</h1>
       </div>
     </div>
 
@@ -69,7 +68,7 @@
         onclick={toggleOverlayWindow}
       >
         <PlayIcon class="w-4 h-4" />
-        <span>切换遮罩窗口</span>
+        <span>切换overlay窗口</span>
         <ExternalLinkIcon class="w-3.5 h-3.5 opacity-70" />
       </button>
 
@@ -79,7 +78,7 @@
         onclick={toggleOverlayEditMode}
       >
         <PenSquareIcon class="w-4 h-4" />
-        <span>编辑遮罩布局</span>
+        <span>编辑overlay布局</span>
         <ExternalLinkIcon class="w-3.5 h-3.5 opacity-70" />
       </button>
     </div>
