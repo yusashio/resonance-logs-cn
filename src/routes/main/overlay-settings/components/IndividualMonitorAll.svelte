@@ -64,7 +64,7 @@
   function removeIndividualMonitorAllAction(): void {
     updateActiveProfile((profile) => ({
       ...profile,
-      individualMonitorAllGroup: removeIndividualMonitorAll(),
+      individualMonitorAllGroup: removeIndividualMonitorAll(profile.individualMonitorAllGroup),
     }));
   }
 
@@ -168,7 +168,7 @@
           新增一个网格区域显示全部 Buff（自动排除已在独立模式中选中的 Buff）
         </p>
       </div>
-      {#if !individualMonitorAllGroup}
+      {#if !individualMonitorAllGroup || !individualMonitorAllGroup.monitorAll}
         <button
           type="button"
           class="text-xs px-3 py-2 rounded border border-border/60 text-foreground hover:bg-muted/40 transition-colors"
@@ -187,7 +187,7 @@
       {/if}
     </div>
 
-    {#if individualMonitorAllGroup}
+    {#if individualMonitorAllGroup && individualMonitorAllGroup.monitorAll}
       <div class="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-3">
         <div class="flex flex-wrap items-center gap-2">
           <input

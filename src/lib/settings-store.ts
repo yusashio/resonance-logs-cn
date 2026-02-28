@@ -141,6 +141,8 @@ export type SkillMonitorProfile = {
   monitoredSkillIds: number[];
   monitoredBuffIds: number[];
   buffPriorityIds: number[];
+  monitoredTextBuffIds: number[];
+  showAllTextBuffs: boolean;
   buffDisplayMode: BuffDisplayMode;
   buffGroups: BuffGroup[];
   individualMonitorAllGroup?: BuffGroup | null;
@@ -221,6 +223,8 @@ export function createDefaultSkillMonitorProfile(
     monitoredSkillIds: [],
     monitoredBuffIds: [],
     buffPriorityIds: [],
+    monitoredTextBuffIds: [],
+    showAllTextBuffs: true,
     buffDisplayMode: "individual",
     buffGroups: [],
     individualMonitorAllGroup: null,

@@ -182,16 +182,16 @@
       };
     }
 
-    classAttr = classAttrValue;
-    attackAttr = attackAttrValue;
-
-    playerAttributes = {
-      uid: attrs.uid,
-      name: attrs.name,
-      className: attrs.className,
-      level: attrs.level,
-      attributes,
-    };
+    // 使用 Object.assign 更新对象属性，确保响应式更新
+    Object.assign(classAttr, classAttrValue);
+    Object.assign(attackAttr, attackAttrValue);
+    
+    // 更新 playerAttributes
+    playerAttributes.uid = attrs.uid;
+    playerAttributes.name = attrs.name;
+    playerAttributes.className = attrs.className;
+    playerAttributes.level = attrs.level;
+    playerAttributes.attributes = attributes;
   }
 
   function updateBuffDisplay(event: Event<BuffUpdatePayload>) {
@@ -258,7 +258,10 @@
   }
 
   onMount(() => {
+    // console.log('[AttrPanel] 组件已挂载，开始监听属性更新事件');
+    
     const unlistenAttr = onAttributeUpdate((event) => {
+      // console.log('[AttrPanel] 收到属性更新事件:', event.payload);
       updateDisplay(event.payload);
     });
 
@@ -267,6 +270,7 @@
     });
 
     return () => {
+      // console.log('[AttrPanel] 组件卸载，清理监听器');
       unlistenAttr.then((fn) => fn());
       unlistenBuff.then((fn) => fn());
       if (rafId) {

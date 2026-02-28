@@ -37,7 +37,7 @@ export function ensureIndividualMonitorAllGroup(
   const normalized = ensureBuffGroup(group, 0);
   return {
     ...normalized,
-    monitorAll: true,
+    monitorAll: group.monitorAll ?? true,
     name: normalized.name || "全部 Buff",
   };
 }

@@ -13,15 +13,20 @@
 
   const monitoredBuffIds = $derived.by(() => activeProfile.monitoredBuffIds);
   const buffPriorityIds = $derived.by(() => activeProfile.buffPriorityIds);
+  const monitoredTextBuffIds = $derived.by(() => activeProfile.monitoredTextBuffIds ?? []);
+  const showAllTextBuffs = $derived.by(() => activeProfile.showAllTextBuffs ?? true);
   const buffDisplayMode = $derived.by(() => activeProfile.buffDisplayMode ?? "individual");
   const textBuffMaxVisible = $derived.by(() => Math.max(1, Math.min(20, activeProfile.textBuffMaxVisible ?? 10)));
 
   let availableBuffs = $state<BuffDefinition[]>([]);
+  let allBuffs = $state<BuffDefinition[]>([]);
   let buffNames = $state(new Map<number, BuffNameInfo>());
   let buffSearch = $state("");
   let buffSearchResults = $state<BuffNameInfo[]>([]);
   let globalPrioritySearch = $state("");
   let globalPrioritySearchResults = $state<BuffNameInfo[]>([]);
+  let textBuffSearch = $state("");
+  let textBuffSearchResults = $state<BuffNameInfo[]>([]);
 
   const availableBuffMap = $derived.by(() => {
     const map = new Map<number, BuffDefinition>();
@@ -36,8 +41,11 @@
     const merged: BuffNameInfo[] = [];
     for (const item of buffSearchResults) {
       if (ids.has(item.baseId)) continue;
-      ids.add(item.baseId);
-      merged.push(item);
+      // 只包含有图标的 Buff
+      if (availableBuffMap.get(item.baseId)) {
+        ids.add(item.baseId);
+        merged.push(item);
+      }
     }
     return merged;
   });
@@ -52,6 +60,15 @@
       const res = await commands.getAvailableBuffs();
       if (res.status === "ok") {
         availableBuffs = res.data;
+      }
+    })();
+  });
+
+  $effect(() => {
+    void (async () => {
+      const res = await commands.getAllBuffs();
+      if (res.status === "ok") {
+        allBuffs = res.data;
       }
     })();
   });
@@ -98,6 +115,22 @@
     })();
   });
 
+  // 文字 Buff 搜索效果
+  $effect(() => {
+    const keyword = textBuffSearch.trim();
+    if (!keyword) {
+      textBuffSearchResults = [];
+      return;
+    }
+    void (async () => {
+      const res = await commands.searchBuffsByName(keyword, 120);
+      if (res.status !== "ok") return;
+      // 过滤出没有图标的 Buff（文字 Buff）
+      const textBuffs = res.data.filter((item) => !item.hasSpriteFile);
+      textBuffSearchResults = textBuffs;
+    })();
+  });
+
   function toggleBuffAction(buffId: number): void {
     updateActiveProfile((profile) => toggleBuff(profile, buffId));
   }
@@ -125,8 +158,38 @@
     updateActiveProfile((profile) => setBuffDisplayMode(profile, mode));
   }
 
+  function toggleShowAllTextBuffs(): void {
+    updateActiveProfile((profile) => ({
+      ...profile,
+      showAllTextBuffs: !profile.showAllTextBuffs,
+    }));
+  }
+
   function isBuffSelected(buffId: number): boolean {
     return monitoredBuffIds.includes(buffId);
+  }
+
+  function toggleTextBuff(buffId: number): void {
+    updateActiveProfile((profile) => {
+      const current = profile.monitoredTextBuffIds ?? [];
+      return {
+        ...profile,
+        monitoredTextBuffIds: current.includes(buffId)
+          ? current.filter((id) => id !== buffId)
+          : [...current, buffId]
+      };
+    });
+  }
+
+  function isTextBuffSelected(buffId: number): boolean {
+    return monitoredTextBuffIds.includes(buffId);
+  }
+
+  function clearTextBuffs(): void {
+    updateActiveProfile((profile) => ({
+      ...profile,
+      monitoredTextBuffIds: []
+    }));
   }
 
   const selectedBuffs = $derived.by(
@@ -136,8 +199,22 @@
         .filter(Boolean) as BuffDefinition[],
   );
 
-  const showAllBuffs = $derived(SETTINGS.skillMonitor?.state?.enableBuff ?? false);
-  const buffSelectionDisabled = $derived(showAllBuffs);
+  // 文字 Buff 相关派生状态
+  const allBuffMap = $derived.by(() => {
+    const map = new Map<number, BuffDefinition>();
+    for (const buff of allBuffs) {
+      map.set(buff.baseId, buff);
+    }
+    return map;
+  });
+
+  const selectedTextBuffs = $derived.by(() => {
+    return monitoredTextBuffIds
+      .map((id) => allBuffMap.get(id))
+      .filter(Boolean) as BuffDefinition[];
+  });
+
+  const buffSelectionDisabled = $derived(false);
 </script>
 
 <div class="space-y-6">
@@ -193,12 +270,6 @@
           </button>
         </div>
       </div>
-
-      <SettingsSwitch
-        bind:checked={SETTINGS.skillMonitor.state.enableBuff}
-        label="显示全部 Buff"
-        description="启用后将显示所有当前生效的 Buff"
-      />
 
       <div class="flex flex-wrap gap-3 items-center" class:disabled={buffSelectionDisabled}>
         <input
@@ -283,17 +354,104 @@
   {/if}
 
   <div class="rounded-lg border border-border/60 bg-card/40 p-4 space-y-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.02)]">
-    <div>
-      <h2 class="text-base font-semibold text-foreground">文本 Buff 设置</h2>
-      <p class="text-xs text-muted-foreground">
-        配置文本形式显示的 Buff
-      </p>
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h2 class="text-base font-semibold text-foreground">文本 Buff 设置</h2>
+        <p class="text-xs text-muted-foreground">
+          配置文本形式显示的 Buff（无图标的 Buff）
+        </p>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="text-xs text-muted-foreground">
+          已选 {monitoredTextBuffIds.length}
+        </div>
+        <button
+          type="button"
+          class="text-xs px-2 py-1 rounded border border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+          onclick={clearTextBuffs}
+        >
+          清空
+        </button>
+      </div>
     </div>
-    <SettingsSwitch
-      bind:checked={SETTINGS.skillMonitor.state.enableTextBuff}
-      label="启用文本 Buff 显示"
-      description="启用后将显示无图标的 Buff"
-    />
+
+    <!-- 文字 Buff 搜索 -->
+    <label class="flex items-center gap-3 py-2.5 px-3 rounded-md hover:bg-popover/50 cursor-pointer transition-colors group">
+      <div class="relative flex items-center justify-center shrink-0">
+        <input
+          type="checkbox"
+          checked={showAllTextBuffs}
+          onchange={toggleShowAllTextBuffs}
+          class="peer appearance-none w-5 h-5 border-2 border-border rounded bg-popover cursor-pointer transition-all
+             checked:bg-primary checked:border-primary
+             hover:border-border/80 checked:hover:border-primary/80
+             focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-0"
+        />
+        <svg class="absolute w-3.5 h-3.5 text-white pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-medium text-foreground group-hover:text-foreground transition-colors">显示全部文字 Buff</div>
+        <div class="text-xs text-muted-foreground mt-0.5 leading-relaxed">启用后将显示所有当前生效的文字 Buff</div>
+      </div>
+    </label>
+
+    <div class="flex flex-wrap gap-3 items-center">
+      <input
+        class="w-full sm:w-64 rounded border border-border/60 bg-muted/30 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+        placeholder="搜索文字 Buff 名称"
+        bind:value={textBuffSearch}
+        disabled={showAllTextBuffs}
+      />
+    </div>
+
+    {#if showAllTextBuffs}
+      <div class="text-xs text-muted-foreground">启用"显示全部文字 Buff"后，将显示所有文字 Buff</div>
+    {:else if textBuffSearch.trim().length === 0}
+      <div class="text-xs text-muted-foreground">请输入关键词搜索文字 Buff</div>
+    {:else if textBuffSearchResults.length > 0}
+      <div class="space-y-2">
+        <div class="text-xs text-muted-foreground">搜索结果（点击添加）</div>
+        <div class="flex flex-wrap gap-2">
+          {#each textBuffSearchResults.slice(0, 20) as item (item.baseId)}
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded border text-xs transition-colors {isTextBuffSelected(item.baseId)
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border/60 hover:border-border hover:bg-muted/30'}"
+              title={item.name}
+              onclick={() => toggleTextBuff(item.baseId)}
+            >
+              {item.name}
+            </button>
+          {/each}
+        </div>
+      </div>
+    {:else if textBuffSearch.trim().length > 0}
+      <div class="text-xs text-muted-foreground">未找到匹配的文字 Buff</div>
+    {/if}
+
+    <!-- 已选文字 Buff -->
+    <div class="space-y-2" class:disabled={showAllTextBuffs}>
+      <div class="text-xs text-muted-foreground">已选文字 Buff（点击移除）</div>
+      <div class="flex flex-wrap gap-2">
+        {#each selectedTextBuffs as buff (buff.baseId)}
+          <button
+            type="button"
+            class="px-3 py-1.5 rounded border border-primary bg-primary/10 text-primary text-xs hover:bg-primary/20 transition-colors"
+            title={buff.name}
+            onclick={() => toggleTextBuff(buff.baseId)}
+          >
+            {buff.name}
+          </button>
+        {/each}
+        {#if selectedTextBuffs.length === 0}
+          <div class="text-xs text-muted-foreground">未选择文字 Buff</div>
+        {/if}
+      </div>
+    </div>
+
     <label class="text-xs text-muted-foreground">
       最大显示数量: {textBuffMaxVisible}
       <input

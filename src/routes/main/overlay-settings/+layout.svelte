@@ -5,9 +5,31 @@
   import ExternalLinkIcon from "virtual:icons/lucide/external-link";
   import PlayIcon from "virtual:icons/lucide/play";
   import PenSquareIcon from "virtual:icons/lucide/pen-square";
+  import Tabs from "./components/Tabs.svelte";
+  import SettingsIcon from "virtual:icons/lucide/settings";
+  import SwordIcon from "virtual:icons/lucide/sword";
+  import ShieldIcon from "virtual:icons/lucide/shield";
+  import FlaskIcon from "virtual:icons/lucide/flask-conical";
+  import BasicSettings from "./components/BasicSettings.svelte";
+  import SkillSettings from "./components/SkillSettings.svelte";
+  import BuffSettings from "./components/BuffSettings.svelte";
+  import TestSettings from "./components/TestSettings.svelte";
   import { SETTINGS } from "$lib/settings-store";
 
   let { children } = $props();
+
+  let activeTab = $state("basic");
+
+  const tabs = [
+    { id: "basic", label: "基础设置", icon: SettingsIcon },
+    { id: "skills", label: "技能设置", icon: SwordIcon },
+    { id: "buffs", label: "Buff 设置", icon: ShieldIcon },
+    { id: "test", label: "测试面板", icon: FlaskIcon },
+  ];
+
+  function handleTabChange(tabId: string): void {
+    activeTab = tabId;
+  }
 
   async function toggleOverlayWindow() {
     try {
@@ -50,8 +72,8 @@
   }
 </script>
 
-<div class="space-y-6">
-  <div class="flex items-center justify-between">
+<div class="flex flex-col h-full">
+  <div class="flex items-center justify-between pb-4 flex-shrink-0">
     <div class="flex items-center gap-3">
       <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary">
         <SwordsIcon class="w-5 h-5" />
@@ -84,7 +106,19 @@
     </div>
   </div>
 
-  <div class="min-h-0">
-    {@render children()}
+  <div class="flex-shrink-0 pb-4">
+    <Tabs tabs={tabs} activeTab={activeTab} onTabChange={handleTabChange} />
+  </div>
+
+  <div class="flex-1 overflow-y-auto">
+    {#if activeTab === "basic"}
+      <BasicSettings />
+    {:else if activeTab === "skills"}
+      <SkillSettings />
+    {:else if activeTab === "buffs"}
+      <BuffSettings />
+    {:else if activeTab === "test"}
+      <TestSettings />
+    {/if}
   </div>
 </div>

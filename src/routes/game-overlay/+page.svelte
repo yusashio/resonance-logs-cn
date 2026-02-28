@@ -6,6 +6,7 @@
     onBuffUpdate,
     onFightResUpdate,
     onSkillCdUpdate,
+    onAttributeUpdate,
     type BuffUpdateState,
     type SkillCdState,
   } from "$lib/api";
@@ -141,12 +142,15 @@
   const selectedClassKey = $derived(activeProfile?.selectedClass ?? "wind_knight");
   const monitoredSkillIds = $derived(activeProfile?.monitoredSkillIds ?? []);
   const monitoredBuffIds = $derived(activeProfile?.monitoredBuffIds ?? []);
+  const monitoredTextBuffIds = $derived(activeProfile?.monitoredTextBuffIds ?? []);
+  const showAllTextBuffs = $derived(activeProfile?.showAllTextBuffs ?? true);
   const buffDisplayMode = $derived(activeProfile?.buffDisplayMode ?? "individual");
   const textBuffMaxVisible = $derived(
     Math.max(1, Math.min(20, activeProfile?.textBuffMaxVisible ?? 10)),
   );
   const attrPanelBuffIds = $derived([2302421, 2110057]);
-  const allMonitoredBuffIds = $derived([...new Set([...monitoredBuffIds, ...attrPanelBuffIds])]);
+  const attrPanelBuffIdSet = $derived(new Set(attrPanelBuffIds));
+  const allMonitoredBuffIds = $derived([...new Set([...monitoredBuffIds, ...attrPanelBuffIds, ...monitoredTextBuffIds])]);
   const normalizedBuffGroups = $derived.by(() => {
     if (!activeProfile) return [];
     return ensureBuffGroups(activeProfile);
@@ -238,7 +242,7 @@
       name: group.name ?? "全部 Buff",
       buffIds: [],
       priorityBuffIds: group.priorityBuffIds ?? [],
-      monitorAll: true,
+      monitorAll: group.monitorAll ?? true,
       position: group.position ?? fallbackPosition,
       iconSize: Math.max(24, Math.min(120, group.iconSize ?? 44)),
       columns: Math.max(1, Math.min(12, group.columns ?? 6)),
@@ -593,6 +597,12 @@
     void commands.setMonitoredBuffs(ids);
   });
 
+  // 当 individualMonitorAllGroup 或 showAllTextBuffs 变化时，更新后端的 monitor_all_buff 状态
+  $effect(() => {
+    const shouldMonitorAll = !!individualMonitorAllGroup?.monitorAll || showAllTextBuffs;
+    void commands.setMonitorAllBuff(shouldMonitorAll);
+  });
+
   const groupedIconBuffs = $derived.by(() => {
     if (buffDisplayMode !== "grouped") return new Map<string, IconBuffDisplay[]>();
     const groups = normalizedBuffGroups;
@@ -619,7 +629,13 @@
 
   const individualModeIconBuffs = $derived.by(() => {
     if (buffDisplayMode !== "individual") return [];
-    if (!individualMonitorAllGroup) return iconDisplayBuffs;
+    if (!individualMonitorAllGroup || !individualMonitorAllGroup.monitorAll) {
+      // 当没有开启"监控全部 Buff"时，只显示 monitoredBuffIds 中的 Buff
+      const selected = new Set(monitoredBuffIds);
+      return iconDisplayBuffs.filter(
+        (buff) => selected.has(buff.baseId) || !!(buff.specialImages && buff.specialImages.length > 0),
+      );
+    }
     const selected = new Set(allMonitoredBuffIds);
     return iconDisplayBuffs.filter(
       (buff) => selected.has(buff.baseId) || !!(buff.specialImages && buff.specialImages.length > 0),
@@ -627,7 +643,7 @@
   });
 
   const individualAllGroupBuffs = $derived.by(() => {
-    if (buffDisplayMode !== "individual" || !individualMonitorAllGroup) return [];
+    if (buffDisplayMode !== "individual" || !individualMonitorAllGroup || !individualMonitorAllGroup.monitorAll) return [];
     const selected = new Set(allMonitoredBuffIds);
     return iconDisplayBuffs.filter(
       (buff) => !selected.has(buff.baseId) && !(buff.specialImages && buff.specialImages.length > 0),
@@ -667,6 +683,11 @@
         continue;
       }
 
+      // 属性面板专用的 Buff 不在这里显示
+      if (attrPanelBuffIdSet.has(baseId)) {
+        continue;
+      }
+
       const def = buffDefinitions.get(baseId);
       const name = def?.name ?? buffNameMap.get(baseId) ?? `#${baseId}`;
       const timeText = buff.durationMs > 0 ? (remaining / 1000).toFixed(1) : "∞";
@@ -688,13 +709,16 @@
           ...(specialImages.length > 0 ? { specialImages } : {}),
         });
       } else {
-        nextTextBuffs.push({
-          baseId,
-          name,
-          text: timeText,
-          remainPercent,
-          layer: buff.layer,
-        });
+        // 只显示在 monitoredTextBuffIds 中的文字 Buff（如果 showAllTextBuffs 为 false）
+        if (showAllTextBuffs || monitoredTextBuffIds.includes(baseId)) {
+          nextTextBuffs.push({
+            baseId,
+            name,
+            text: timeText,
+            remainPercent,
+            layer: buff.layer,
+          });
+        }
       }
     }
 
@@ -704,6 +728,8 @@
       const iconIds = new Set(nextIconBuffs.map((buff) => buff.baseId));
       const textIds = new Set(nextTextBuffs.map((buff) => buff.baseId));
       for (const baseId of allMonitoredBuffIds) {
+        // 属性面板专用的 Buff 不在这里显示
+        if (attrPanelBuffIdSet.has(baseId)) continue;
         if (iconIds.has(baseId) || textIds.has(baseId)) continue;
         const def = buffDefinitions.get(baseId);
         const name = def?.name ?? buffNameMap.get(baseId) ?? `#${baseId}`;
@@ -725,14 +751,17 @@
               : {}),
           });
         } else {
-          nextTextBuffs.push({
-            baseId,
-            name,
-            text: "--",
-            remainPercent: 0,
-            layer: 1,
-            isPlaceholder: true,
-          });
+          // 编辑模式下也只显示在 monitoredTextBuffIds 中的文字 Buff（如果 showAllTextBuffs 为 false）
+          if (showAllTextBuffs || monitoredTextBuffIds.includes(baseId)) {
+            nextTextBuffs.push({
+              baseId,
+              name,
+              text: "--",
+              remainPercent: 0,
+              layer: 1,
+              isPlaceholder: true,
+            });
+          }
         }
       }
     }
@@ -778,6 +807,8 @@
         buffGroups: ensureBuffGroups(profile),
         individualMonitorAllGroup: ensureIndividualMonitorAllGroup(profile),
         textBuffMaxVisible: Math.max(1, Math.min(20, profile.textBuffMaxVisible ?? 10)),
+        showAllTextBuffs: profile.showAllTextBuffs ?? true,
+        monitoredTextBuffIds: profile.monitoredTextBuffIds ?? [],
       }));
     }
 
@@ -823,6 +854,11 @@
       fightResValues = event.payload.fightRes.values;
     });
 
+    // 监听属性更新事件，用于属性面板
+    const unlistenAttr = onAttributeUpdate((event) => {
+      console.log('[game-overlay] 收到属性更新事件:', event.payload.playerAttributes);
+    });
+
     // Preload names for monitored ids so edit mode can show non-active buffs.
     void loadBuffNames(allMonitoredBuffIds);
 
@@ -835,6 +871,7 @@
       unlistenBuff.then((fn) => fn());
       unlisten.then((fn) => fn());
       unlistenRes.then((fn) => fn());
+      unlistenAttr.then((fn) => fn());
       window.removeEventListener("pointermove", onGlobalPointerMove);
       window.removeEventListener("pointerup", onGlobalPointerUp);
       if (rafId) cancelAnimationFrame(rafId);
@@ -1195,7 +1232,7 @@
           {/if}
         </div>
       {/each}
-      {#if individualMonitorAllGroup && (individualAllGroupBuffs.length > 0 || isEditing)}
+      {#if individualMonitorAllGroup && individualMonitorAllGroup.monitorAll && (individualAllGroupBuffs.length > 0 || isEditing)}
         {@const maxVisible = Math.max(1, individualMonitorAllGroup.columns * individualMonitorAllGroup.rows)}
         <div
           class="overlay-group buff-group-container"

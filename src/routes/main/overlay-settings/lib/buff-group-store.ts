@@ -62,15 +62,28 @@ export function ensureBuffGroup(group: BuffGroup, index: number): BuffGroup {
 export function addIndividualMonitorAll(
   current: BuffGroup | null | undefined,
 ): BuffGroup | null {
-  if (current) return current;
+  if (current) {
+    // 如果已存在（可能是被禁用的），则重新启用
+    return {
+      ...current,
+      monitorAll: true,
+    };
+  }
   return {
     ...createDefaultBuffGroup("全部 Buff", 1),
     monitorAll: true,
   };
 }
 
-export function removeIndividualMonitorAll(): null {
-  return null;
+export function removeIndividualMonitorAll(
+  current: BuffGroup | null | undefined,
+): BuffGroup | null {
+  if (!current) return null;
+  // 保留位置信息，只将 monitorAll 设为 false
+  return {
+    ...current,
+    monitorAll: false,
+  };
 }
 
 export function updateIndividualMonitorAllGroup(
