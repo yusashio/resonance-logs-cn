@@ -17,6 +17,10 @@ struct RawBuffEntry {
     name: Option<String>,
     #[serde(rename = "SpriteFile")]
     sprite_file: Option<String>,
+    #[serde(rename = "TalentName")]
+    talent_name: Option<String>,
+    #[serde(rename = "TalentSpriteFile")]
+    talent_sprite_file: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -24,6 +28,8 @@ pub struct BuffNameEntry {
     pub name: String,
     pub icon: String,
     pub sprite_file: Option<String>,
+    pub talent_name: Option<String>,
+    pub talent_sprite_file: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -31,6 +37,8 @@ pub struct BuffSpriteEntry {
     pub base_id: i32,
     pub name: String,
     pub sprite_file: String,
+    pub talent_name: Option<String>,
+    pub talent_sprite_file: Option<String>,
 }
 
 /// Cache stores buff metadata keyed by buff id.
@@ -81,12 +89,16 @@ fn load_buff_names() -> Result<HashMap<i32, BuffNameEntry>, Box<dyn std::error::
         }
         let icon = entry.icon.unwrap_or_default();
         let sprite_file = entry.sprite_file.and_then(|v| if v.is_empty() { None } else { Some(v) });
+        let talent_name = entry.talent_name.and_then(|v| if v.is_empty() { None } else { Some(v) });
+        let talent_sprite_file = entry.talent_sprite_file.and_then(|v| if v.is_empty() { None } else { Some(v) });
         buff_map.insert(
             entry.id,
             BuffNameEntry {
                 name,
                 icon,
                 sprite_file,
+                talent_name,
+                talent_sprite_file,
             },
         );
     }
@@ -126,7 +138,26 @@ pub fn get_buffs_with_sprites() -> Vec<BuffSpriteEntry> {
                     base_id: *id,
                     name: entry.name.clone(),
                     sprite_file: sprite.clone(),
+                    talent_name: entry.talent_name.clone(),
+                    talent_sprite_file: entry.talent_sprite_file.clone(),
                 })
+        })
+        .collect();
+    result.sort_by_key(|entry| entry.base_id);
+    result
+}
+
+/// Returns all buffs (including those without sprites).
+pub fn get_all_buffs() -> Vec<BuffSpriteEntry> {
+    let cache = BUFF_CACHE.read();
+    let mut result: Vec<BuffSpriteEntry> = cache
+        .iter()
+        .map(|(id, entry)| BuffSpriteEntry {
+            base_id: *id,
+            name: entry.name.clone(),
+            sprite_file: entry.sprite_file.clone().unwrap_or_default(),
+            talent_name: entry.talent_name.clone(),
+            talent_sprite_file: entry.talent_sprite_file.clone(),
         })
         .collect();
     result.sort_by_key(|entry| entry.base_id);

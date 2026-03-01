@@ -206,6 +206,34 @@ pub async fn get_available_buffs(
                 base_id: entry.base_id,
                 name: entry.name,
                 sprite_file: entry.sprite_file,
+                talent_name: entry.talent_name,
+                talent_sprite_file: entry.talent_sprite_file,
+                search_keywords,
+            }
+        })
+        .collect();
+    Ok(buffs)
+}
+
+/// Returns all buffs (including those without sprites).
+#[tauri::command]
+#[specta::specta]
+pub async fn get_all_buffs(
+    _state_manager: tauri::State<'_, AppStateManager>,
+) -> Result<Vec<crate::live::commands_models::BuffDefinition>, String> {
+    use crate::live::buff_names;
+    use crate::live::commands_models::BuffDefinition;
+
+    let buffs = buff_names::get_all_buffs()
+        .into_iter()
+        .map(|entry| {
+            let search_keywords = vec![entry.name.clone()];
+            BuffDefinition {
+                base_id: entry.base_id,
+                name: entry.name,
+                sprite_file: entry.sprite_file,
+                talent_name: entry.talent_name,
+                talent_sprite_file: entry.talent_sprite_file,
                 search_keywords,
             }
         })
@@ -308,4 +336,41 @@ pub async fn set_buff_priority(
     info!("[monitor-buff] set buff priority: {:?}", priority_buff_ids);
     state_manager.set_buff_priority(priority_buff_ids).await?;
     Ok(())
+}
+
+/// 获取实体血量信息
+#[tauri::command]
+#[specta::specta]
+pub async fn get_entity_health(
+    state_manager: tauri::State<'_, AppStateManager>,
+) -> Result<Vec<crate::live::commands_models::EntityHealth>, String> {
+    let snapshot = state_manager.latest_snapshot();
+    
+    let entities: Vec<crate::live::commands_models::EntityHealth> = snapshot
+        .encounter
+        .entity_uid_to_entity
+        .iter()
+        .filter_map(|(&uid, entity)| {
+            // 获取血量信息（可能为空）
+            let current_hp = entity.hp();
+            let max_hp = entity.max_hp();
+            
+            let name = if !entity.name.is_empty() {
+                entity.name.clone()
+            } else {
+                format!("Entity {uid}")
+            };
+            
+            Some(crate::live::commands_models::EntityHealth {
+                uid,
+                name,
+                current_hp,
+                max_hp,
+                monster_type_id: entity.monster_type_id,
+                entity_type: entity.entity_type as i32,
+            })
+        })
+        .collect();
+    
+    Ok(entities)
 }

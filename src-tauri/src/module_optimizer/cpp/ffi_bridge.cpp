@@ -95,8 +95,15 @@ static std::unordered_map<int, int> to_map(
 
 ::std::int32_t test_cuda_ffi() {
 #ifdef USE_CUDA
-    return ::TestCuda();
+    printf("test_cuda_ffi: USE_CUDA is defined, calling TestCuda()\n");
+    fflush(stdout);
+    int result = ::TestCuda();
+    printf("test_cuda_ffi: TestCuda() returned %d\n", result);
+    fflush(stdout);
+    return result;
 #else
+    printf("test_cuda_ffi: USE_CUDA is NOT defined\n");
+    fflush(stdout);
     return 0;
 #endif
 }

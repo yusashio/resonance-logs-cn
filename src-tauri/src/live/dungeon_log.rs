@@ -164,6 +164,8 @@ pub struct Segment {
     pub total_damage: i64,
     pub hit_count: u64,
     pub events: Vec<DamageEvent>,
+    /// 按敌人ID聚合的统计数据
+    pub monster_stats: Vec<MonsterStats>,
     #[serde(skip)]
     #[specta(skip)]
     pub persisted: bool,
@@ -187,6 +189,7 @@ impl Segment {
             total_damage: 0,
             hit_count: 0,
             events: Vec::new(),
+            monster_stats: Vec::new(),
             persisted: false,
             boss_entity_ids: HashSet::new(),
         }
@@ -210,7 +213,38 @@ impl Segment {
         self.total_damage = self.total_damage.saturating_add(event.amount.max(0));
         self.hit_count = self.hit_count.saturating_add(1);
         if self.events.len() < MAX_SEGMENT_EVENTS {
-            self.events.push(event);
+            self.events.push(event.clone());
+        }
+        // 更新按敌人分组的统计数据
+        self.update_monster_stats(&event);
+    }
+
+    /// 更新按敌人分组的统计数据
+    fn update_monster_stats(&mut self, event: &DamageEvent) {
+        if let Some(stats) = self.monster_stats.iter_mut().find(|s| s.target_id == event.target_id) {
+            stats.hit_count += 1;
+            stats.total_damage += event.amount.max(0);
+            // 更新最后一次被攻击时间
+            stats.last_hit_at_ms = event.timestamp_ms;
+            // 更新名称（如果之前没有）
+            if stats.target_name.is_none() && event.target_name.is_some() {
+                stats.target_name = event.target_name.clone();
+            }
+            // 更新怪物类型ID（如果之前没有）
+            if stats.target_monster_type_id.is_none() && event.target_monster_type_id.is_some() {
+                stats.target_monster_type_id = event.target_monster_type_id;
+            }
+        } else {
+            // 创建新的怪物统计条目
+            self.monster_stats.push(MonsterStats {
+                target_id: event.target_id,
+                target_name: event.target_name.clone(),
+                target_monster_type_id: event.target_monster_type_id,
+                is_boss: event.is_boss_target,
+                hit_count: 1,
+                total_damage: event.amount.max(0),
+                last_hit_at_ms: event.timestamp_ms,
+            });
         }
     }
 
@@ -276,6 +310,20 @@ pub struct DamageEvent {
     pub amount: i64,
     pub is_boss_target: bool,
     pub is_killing_blow: bool,
+}
+
+/// 敌人统计数据 - 按目标ID聚合的伤害统计
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct MonsterStats {
+    pub target_id: i64,
+    pub target_name: Option<String>,
+    pub target_monster_type_id: Option<i64>,
+    pub is_boss: bool,
+    pub hit_count: u64,
+    pub total_damage: i64,
+    /// 最后一次被攻击的时间戳（毫秒）
+    pub last_hit_at_ms: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, specta::Type)]
@@ -1003,8 +1051,9 @@ impl DungeonLog {
             return !GLOBAL_BOSS_LIST.contains(&cached_monster_type_id);
         }
 
-        // No info available - don't treat as trash (might be a boss we don't know about yet)
-        false
+        // No info available - treat as trash to record the event
+        // This ensures new targets are tracked even before their attributes arrive
+        true
     }
 
     fn is_boss_event(&self, event: &DamageEvent) -> bool {

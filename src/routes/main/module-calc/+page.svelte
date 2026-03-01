@@ -89,6 +89,7 @@
         excludeAttributes: [...MODULE_CALC.excludeAttributes],
         minAttrRequirements: minMap,
         useGpu: MODULE_CALC.useGpu,
+        minModuleScore: MODULE_CALC.minModuleScore,
       };
 
       console.log("Calling optimize_latest_modules with:", payload);
@@ -152,7 +153,7 @@
       </Button>
       <Button
         onclick={runOptimize}
-        disabled={MODULE_CALC.loading || (MODULE_CALC.moduleCount || 0) < 4}
+        disabled={MODULE_CALC.loading || (MODULE_CALC.moduleCount || 0) < 5}
       >
         {#if MODULE_CALC.loading}
           <Loader2 class="w-4 h-4 mr-2 animate-spin" />
@@ -186,6 +187,8 @@
     bind:targetAttributes={MODULE_CALC.targetAttributes}
     bind:excludeAttributes={MODULE_CALC.excludeAttributes}
     bind:minRequirements={MODULE_CALC.minRequirements}
+    bind:minModuleScore={MODULE_CALC.minModuleScore}
+    modules={MODULE_CALC.modules}
   />
 
   <div class="rounded-lg border border-border/60 bg-card/40 p-4 space-y-3">

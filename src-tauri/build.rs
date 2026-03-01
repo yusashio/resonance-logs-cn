@@ -3,7 +3,6 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
-    // Read version from tauri.conf.json and expose as APP_VERSION environment variable
     let tauri_conf =
         std::fs::read_to_string("tauri.conf.json").expect("Failed to read tauri.conf.json");
     let conf: serde_json::Value =
@@ -13,7 +12,6 @@ fn main() {
         .expect("No version field in tauri.conf.json");
     println!("cargo:rustc-env=APP_VERSION={}", version);
 
-    // Forward API URLs from build environment to compile-time env vars
     if let Ok(url) = env::var("UPLOAD_API_URL") {
         println!("cargo:rustc-env=UPLOAD_API_URL={}", url);
     }
@@ -21,10 +19,8 @@ fn main() {
         println!("cargo:rustc-env=TRACKING_API_URL={}", url);
     }
 
-    // Build module_optimizer C++ code
     build_module_optimizer();
 
-    // Use the standard debug_assertions cfg to differentiate dev vs release.
     if cfg!(debug_assertions) {
         println!("DEBUG (dev) BUILD");
         tauri_build::build();
@@ -40,7 +36,6 @@ fn build_module_optimizer() {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let cpp_dir = manifest_dir.join("src/module_optimizer/cpp");
 
-    // Check if cpp directory exists
     if !cpp_dir.exists() {
         println!(
             "cargo:warning=C++ directory not found: {:?}, skipping module_optimizer build",
@@ -51,20 +46,17 @@ fn build_module_optimizer() {
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-    // Detect CUDA and OpenCL
     let use_cuda = detect_cuda();
     let use_opencl = detect_opencl();
 
     println!("cargo:warning=CUDA detected: {}", use_cuda);
     println!("cargo:warning=OpenCL detected: {}", use_opencl);
 
-    // Build C++ source files list
     let mut cpp_sources = vec![
         cpp_dir.join("module_optimizer.cpp"),
         cpp_dir.join("ffi_bridge.cpp"),
     ];
 
-    // Compile CUDA code if available
     let cuda_obj = if use_cuda {
         compile_cuda(&cpp_dir, &out_dir)
     } else {
@@ -76,13 +68,11 @@ fn build_module_optimizer() {
         println!("cargo:rustc-cfg=feature=\"cuda\"");
     }
 
-    // Add OpenCL source file if available
     if use_opencl {
         println!("cargo:rustc-cfg=feature=\"opencl\"");
         cpp_sources.push(cpp_dir.join("module_optimizer_opencl.cpp"));
     }
 
-    // Use cxx-build to compile
     let mut build = cxx_build::bridge("src/module_optimizer/bridge.rs");
 
     build
@@ -95,7 +85,6 @@ fn build_module_optimizer() {
         .flag_if_supported("/MD")
         .flag_if_supported("-O2");
 
-    // CUDA configuration
     if cuda_enabled {
         if let Some(cuda_home) = find_cuda_home() {
             println!("cargo:warning=Linking CUDA from: {}", cuda_home.display());
@@ -117,7 +106,6 @@ fn build_module_optimizer() {
         }
     }
 
-    // OpenCL configuration
     if use_opencl {
         build.define("USE_OPENCL", None);
 
@@ -133,7 +121,6 @@ fn build_module_optimizer() {
 
     build.compile("module_optimizer_cpp");
 
-    // Rerun if changed
     println!("cargo:rerun-if-changed=src/module_optimizer/bridge.rs");
     println!("cargo:rerun-if-changed=src/module_optimizer/cpp/");
 }
@@ -151,10 +138,11 @@ fn detect_opencl() -> bool {
 }
 
 fn find_cuda_home() -> Option<PathBuf> {
-    // Try multiple possible paths
     let paths = [
         env::var("CUDA_HOME").ok(),
         env::var("CUDA_PATH").ok(),
+        Some(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1".to_string()),
+        Some(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.0".to_string()),
         Some(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9".to_string()),
     ];
 
@@ -168,7 +156,6 @@ fn find_cuda_home() -> Option<PathBuf> {
 }
 
 fn find_opencl() -> Option<PathBuf> {
-    // Check CUDA path for OpenCL (NVIDIA ships OpenCL with CUDA)
     if let Some(cuda_home) = find_cuda_home() {
         let opencl_lib = cuda_home.join("lib/x64/OpenCL.lib");
         if opencl_lib.exists() {
@@ -176,7 +163,6 @@ fn find_opencl() -> Option<PathBuf> {
         }
     }
 
-    // Check OPENCL_HOME environment variable
     if let Ok(opencl_home) = env::var("OPENCL_HOME") {
         let p = PathBuf::from(&opencl_home);
         if p.join("lib/x64/OpenCL.lib").exists() {
@@ -200,14 +186,12 @@ fn compile_cuda(cpp_dir: &PathBuf, out_dir: &PathBuf) -> Option<PathBuf> {
         return None;
     }
 
-    // Find Visual Studio
     let vs_paths = [
         r"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat",
     ];
 
     let vs_vars = vs_paths.iter().find(|p| PathBuf::from(p).exists())?;
 
-    // Create a temporary batch file to handle environment setup and compilation
     let bat_file = out_dir.join("compile_cuda.bat");
     let nvcc_cmd = format!(
         r#"nvcc -c "{}" -o "{}" -std=c++17 --compiler-options "/O2,/std:c++17,/EHsc,/MD,/utf-8" --use_fast_math -I"{}" -gencode=arch=compute_75,code=sm_75 -gencode=arch=compute_86,code=sm_86 -gencode=arch=compute_89,code=sm_89 -gencode=arch=compute_120,code=sm_120"#,

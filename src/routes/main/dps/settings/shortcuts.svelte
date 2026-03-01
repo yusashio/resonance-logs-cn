@@ -139,6 +139,10 @@
       label: "切换实时窗口",
     },
     {
+      id: "toggleOverlayWindow",
+      label: "切换 Overlay 窗口",
+    },
+    {
       id: "enableClickthrough",
       label: "启用点击穿透",
     },

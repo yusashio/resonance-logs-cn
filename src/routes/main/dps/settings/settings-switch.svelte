@@ -3,15 +3,26 @@
     label = "",
     description = "",
     checked = $bindable(false),
+    onchange,
   }: {
     label: string;
     description?: string | undefined;
     checked: boolean | undefined;
+    onchange?: (event: Event) => void;
   } = $props();
 
   // If checked is undefined, give it a default (e.g. false)
   if (checked === undefined) {
     checked = true;
+  }
+
+  function handleChange(event: Event) {
+    if (onchange) {
+      onchange(event);
+    } else {
+      const target = event.currentTarget as HTMLInputElement;
+      checked = target.checked;
+    }
   }
 </script>
 
@@ -19,7 +30,8 @@
   <div class="relative flex items-center justify-center shrink-0">
     <input
       type="checkbox"
-      bind:checked
+      {checked}
+      onchange={handleChange}
       class="peer appearance-none w-5 h-5 border-2 border-border rounded bg-popover cursor-pointer transition-all
              checked:bg-primary checked:border-primary
              hover:border-border/80 checked:hover:border-primary/80

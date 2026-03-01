@@ -1,0 +1,82 @@
+{
+  "雷影剑士": {
+    "primaryAttr": {
+      "attrId": 11010,
+      "attrName": "力量"
+    },
+    "attackAttr": {
+      "attrId": 11330,
+      "attrName": "物理攻击"
+    }
+  },
+  "神盾骑士": {
+    "primaryAttr": {
+      "attrId": 11010,
+      "attrName": "力量"
+    },
+    "attackAttr": {
+      "attrId": 11330,
+      "attrName": "物理攻击"
+    }
+  },
+  "巨刃守护者": {
+    "primaryAttr": {
+      "attrId": 11010,
+      "attrName": "力量"
+    },
+    "attackAttr": {
+      "attrId": 11330,
+      "attrName": "物理攻击"
+    }
+  },
+  "青岚骑士": {
+    "primaryAttr": {
+      "attrId": 11030,
+      "attrName": "敏捷"
+    },
+    "attackAttr": {
+      "attrId": 11330,
+      "attrName": "物理攻击"
+    }
+  },
+  "神射手": {
+    "primaryAttr": {
+      "attrId": 11030,
+      "attrName": "敏捷"
+    },
+    "attackAttr": {
+      "attrId": 11330,
+      "attrName": "物理攻击"
+    }
+  },
+  "冰魔导师": {
+    "primaryAttr": {
+      "attrId": 11020,
+      "attrName": "智力"
+    },
+    "attackAttr": {
+      "attrId": 11340,
+      "attrName": "魔法攻击"
+    }
+  },
+  "森语者": {
+    "primaryAttr": {
+      "attrId": 11020,
+      "attrName": "智力"
+    },
+    "attackAttr": {
+      "attrId": 11340,
+      "attrName": "魔法攻击"
+    }
+  },
+  "灵魂乐手": {
+    "primaryAttr": {
+      "attrId": 11020,
+      "attrName": "智力"
+    },
+    "attackAttr": {
+      "attrId": 11340,
+      "attrName": "魔法攻击"
+    }
+  }
+}

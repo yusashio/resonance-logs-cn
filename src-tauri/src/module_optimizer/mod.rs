@@ -127,7 +127,7 @@ pub fn parse_modules_from_vdata(v_data: &blueprotobuf::CharSerialize) -> Vec<Mod
     let mod_infos = if let Some(mod_data) = &v_data.r#mod {
         &mod_data.mod_infos
     } else {
-        log::warn!("v_data 中没有 mod_infos");
+        log::warn!("v_data 中没有 mod 数据");
         return modules;
     };
 
@@ -146,7 +146,6 @@ pub fn parse_modules_from_vdata(v_data: &blueprotobuf::CharSerialize) -> Vec<Mod
 
                 let config_id = item.config_id.unwrap_or(0);
                 if !module_name_map.contains_key(&config_id) {
-                    log::info!("跳过未知模组 config_id: {}", config_id);
                     continue;
                 }
 
@@ -160,7 +159,7 @@ pub fn parse_modules_from_vdata(v_data: &blueprotobuf::CharSerialize) -> Vec<Mod
                 let init_link_nums = if let Some(info) = mod_infos.get(key) {
                     &info.init_link_nums
                 } else {
-                    log::info!("未找到模组属性值 key: {}", key);
+                    log::debug!("未找到模组属性值 key: {} (config_id={})", key, config_id);
                     continue;
                 };
 
@@ -195,7 +194,6 @@ pub fn parse_modules_from_vdata(v_data: &blueprotobuf::CharSerialize) -> Vec<Mod
         }
     }
 
-    log::info!("解析到 {} 个模组", modules.len());
     modules
 }
 
@@ -263,6 +261,7 @@ pub fn is_opencl_available() -> bool {
 
 pub fn check_gpu_support() -> GpuSupport {
     let info = bridge::ffi::check_gpu_support_ffi();
+    log::info!("GPU support check: cuda={}, opencl={}", info.cuda_available, info.opencl_available);
     GpuSupport {
         cuda_available: info.cuda_available,
         opencl_available: info.opencl_available,

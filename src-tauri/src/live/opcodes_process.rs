@@ -1,5 +1,5 @@
 // NOTE: opcodes_process works on Encounter directly; avoid importing opcodes_models at top-level.
-use crate::database::{CachedEntity, CachedPlayerData, now_ms};
+use crate::database::{CachedEntity, CachedPlayerData, flush_playerdata, now_ms};
 use crate::live::dungeon_log::{self, BattleStateMachine, DungeonLogRuntime, EncounterResetReason};
 use crate::live::opcodes_models::class::{
     ClassSpec, get_class_id_from_spec, get_class_spec_from_skill_id,
@@ -274,6 +274,7 @@ pub fn process_sync_near_entities(
     encounter: &mut Encounter,
     entity_cache: &mut HashMap<i64, CachedEntity>,
     sync_near_entities: blueprotobuf::SyncNearEntities,
+    mut event_manager: Option<&mut crate::live::event_manager::EventManager>,
 ) -> Option<()> {
     for pkt_entity in sync_near_entities.appear {
         let target_uuid = pkt_entity.uuid?;
@@ -293,6 +294,8 @@ pub fn process_sync_near_entities(
                     target_uid,
                     pkt_entity.attrs?.attrs,
                     entity_cache,
+                    event_manager.as_mut().map(|em| &mut **em),
+                    encounter.local_player_uid,
                 );
             }
             EEntityType::EntMonster => {
@@ -379,12 +382,19 @@ pub fn process_sync_container_data(
         // Serialize v_data to protobuf bytes
         let vdata_bytes = <blueprotobuf::CharSerialize as prost::Message>::encode_to_vec(&v_data);
 
-        *playerdata_cache = Some(CachedPlayerData {
+        let cached_data = CachedPlayerData {
             player_id: player_uid,
             last_seen_ms: now,
             vdata_bytes,
             dirty: true,
-        });
+        };
+        
+        // 立即保存到数据库，确保模组数据可用
+        if let Err(e) = flush_playerdata(cached_data.clone()) {
+            log::warn!("立即保存玩家数据失败: {}", e);
+        }
+        
+        *playerdata_cache = Some(cached_data);
 
         // Emit attribute update event for the local player
         if let Some(em) = event_manager {
@@ -572,6 +582,7 @@ pub fn process_sync_to_me_delta_info(
     entity_cache: &mut HashMap<i64, CachedEntity>,
     sync_to_me_delta_info: blueprotobuf::SyncToMeDeltaInfo,
     dungeon_runtime: Option<&DungeonLogRuntime>,
+    mut event_manager: Option<&mut crate::live::event_manager::EventManager>,
 ) -> Option<()> {
     let delta_info = match sync_to_me_delta_info.delta_info {
         Some(info) => info,
@@ -586,7 +597,7 @@ pub fn process_sync_to_me_delta_info(
     }
 
     if let Some(base_delta) = delta_info.base_delta {
-        process_aoi_sync_delta(encounter, entity_cache, base_delta, dungeon_runtime);
+        process_aoi_sync_delta(encounter, entity_cache, base_delta, dungeon_runtime, event_manager);
     }
 
     Some(())
@@ -597,6 +608,7 @@ pub fn process_aoi_sync_delta(
     entity_cache: &mut HashMap<i64, CachedEntity>,
     aoi_sync_delta: blueprotobuf::AoiSyncDelta,
     dungeon_runtime: Option<&DungeonLogRuntime>,
+    mut event_manager: Option<&mut crate::live::event_manager::EventManager>,
 ) -> Option<()> {
     let target_uuid = aoi_sync_delta.uuid?; // UUID =/= uid (have to >> 16)
     let target_uid = target_uuid >> 16;
@@ -619,6 +631,8 @@ pub fn process_aoi_sync_delta(
                     target_uid,
                     attrs_collection.attrs,
                     entity_cache,
+                    event_manager.as_mut().map(|em| &mut **em),
+                    encounter.local_player_uid,
                 );
             }
             EEntityType::EntMonster => {
@@ -1002,6 +1016,8 @@ fn process_player_attrs(
     target_uid: i64,
     attrs: Vec<Attr>,
     entity_cache: &mut HashMap<i64, CachedEntity>,
+    event_manager: Option<&mut crate::live::event_manager::EventManager>,
+    encounter_local_player_uid: i64,
 ) {
     use crate::live::opcodes_models::{AttrType, AttrValue};
     use bytes::Buf;
@@ -1528,6 +1544,56 @@ fn process_player_attrs(
                     }
                 }
             }
+        }
+    }
+
+    // 发送属性更新事件（仅针对本地玩家）
+    if target_uid == encounter_local_player_uid {
+        if let Some(em) = event_manager {
+            use crate::live::opcodes_models::class;
+            use crate::live::event_manager::{AttributeValue, AttributeValueEnum};
+            use crate::live::fight_attr;
+
+            let class_name = class::get_class_name(player_entity.class_id);
+            let attributes: Vec<AttributeValue> = player_entity
+                .attributes
+                .iter()
+                .map(|(attr_type, attr_value)| {
+                    let attr_id = attr_type.to_id();
+                    let attr_name = fight_attr::get_attr_name(attr_id)
+                        .unwrap_or_else(|| format!("{:?}", attr_type));
+                    let attr_num_type = fight_attr::get_attr_num_type(attr_id);
+                    let value = match attr_value {
+                        AttrValue::Int(v) => AttributeValueEnum::Int(*v),
+                        AttrValue::Float(v) => AttributeValueEnum::Float(*v),
+                        AttrValue::String(v) => AttributeValueEnum::String(v.clone()),
+                        AttrValue::Bool(v) => AttributeValueEnum::Bool(*v),
+                    };
+                    AttributeValue {
+                        attr_id,
+                        attr_name,
+                        value,
+                        attr_num_type,
+                    }
+                })
+                .collect();
+
+            log::trace!(
+                "Emitting attribute update from process_player_attrs for player {} (uid: {}, class: {}, level: {}, attrs count: {})",
+                player_entity.name,
+                target_uid,
+                class_name,
+                player_entity.level,
+                attributes.len()
+            );
+
+            em.emit_attribute_update(
+                target_uid,
+                player_entity.name.clone(),
+                class_name,
+                player_entity.level,
+                attributes,
+            );
         }
     }
 }

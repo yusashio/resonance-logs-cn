@@ -6,6 +6,7 @@
     onBuffUpdate,
     onFightResUpdate,
     onSkillCdUpdate,
+    onAttributeUpdate,
     type BuffUpdateState,
     type SkillCdState,
   } from "$lib/api";
@@ -25,6 +26,8 @@
     findSkillDerivationBySource,
     findSpecialBuffDisplays,
   } from "$lib/skill-mappings";
+  import AttrPanel from "./components/AttrPanel.svelte";
+  import MonsterHealthPanel from "./components/MonsterHealthPanel.svelte";
 
   type SkillDisplay = {
     isActive: boolean;
@@ -91,17 +94,22 @@
     resourceGroup: { x: 40, y: 170 },
     textBuffPanel: { x: 360, y: 40 },
     specialBuffGroup: { x: 360, y: 220 },
+    attrPanel: { x: 40, y: 310 },
+    monsterHealthPanel: { x: 40, y: 450 },
     iconBuffPositions: {},
   };
   const DEFAULT_OVERLAY_SIZES: OverlaySizes = {
     skillCdGroupScale: 1,
     resourceGroupScale: 1,
     textBuffPanelScale: 1,
+    attrPanelScale: 1,
+    monsterHealthPanelScale: 1,
     iconBuffSizes: {},
   };
   const DEFAULT_OVERLAY_VISIBILITY: OverlayVisibility = {
     showSkillCdGroup: true,
     showResourceGroup: true,
+    showAttrPanel: true,
   };
 
   let cdMap = $state(new Map<number, SkillCdState>());
@@ -137,10 +145,15 @@
   const selectedClassKey = $derived(activeProfile?.selectedClass ?? "wind_knight");
   const monitoredSkillIds = $derived(activeProfile?.monitoredSkillIds ?? []);
   const monitoredBuffIds = $derived(activeProfile?.monitoredBuffIds ?? []);
+  const monitoredTextBuffIds = $derived(activeProfile?.monitoredTextBuffIds ?? []);
+  const showAllTextBuffs = $derived(activeProfile?.showAllTextBuffs ?? true);
   const buffDisplayMode = $derived(activeProfile?.buffDisplayMode ?? "individual");
   const textBuffMaxVisible = $derived(
     Math.max(1, Math.min(20, activeProfile?.textBuffMaxVisible ?? 10)),
   );
+  const attrPanelBuffIds = $derived([2302421, 2110057]);
+  const attrPanelBuffIdSet = $derived(new Set(attrPanelBuffIds));
+  const allMonitoredBuffIds = $derived([...new Set([...monitoredBuffIds, ...attrPanelBuffIds, ...monitoredTextBuffIds])]);
   const normalizedBuffGroups = $derived.by(() => {
     if (!activeProfile) return [];
     return ensureBuffGroups(activeProfile);
@@ -149,9 +162,14 @@
     if (!activeProfile) return null;
     return ensureIndividualMonitorAllGroup(activeProfile);
   });
-  const overlayVisibility = $derived(
-    activeProfile?.overlayVisibility ?? DEFAULT_OVERLAY_VISIBILITY,
-  );
+  const overlayVisibility = $derived.by(() => {
+    if (!activeProfile) return DEFAULT_OVERLAY_VISIBILITY;
+    const baseVisibility = ensureOverlayVisibility(activeProfile);
+    return {
+      ...baseVisibility,
+      showAttrPanel: baseVisibility.showAttrPanel && SETTINGS.attrMonitor.state.enabled,
+    };
+  });
   const specialBuffConfigMap = $derived.by(() => {
     const map = new Map<number, SpecialBuffDisplay>();
     for (const config of findSpecialBuffDisplays(selectedClassKey)) {
@@ -167,6 +185,8 @@
       resourceGroup: current?.resourceGroup ?? DEFAULT_OVERLAY_POSITIONS.resourceGroup,
       textBuffPanel: current?.textBuffPanel ?? DEFAULT_OVERLAY_POSITIONS.textBuffPanel,
       specialBuffGroup: current?.specialBuffGroup ?? DEFAULT_OVERLAY_POSITIONS.specialBuffGroup,
+      attrPanel: current?.attrPanel ?? DEFAULT_OVERLAY_POSITIONS.attrPanel,
+      monsterHealthPanel: current?.monsterHealthPanel ?? DEFAULT_OVERLAY_POSITIONS.monsterHealthPanel,
       iconBuffPositions: current?.iconBuffPositions ?? {},
     };
   }
@@ -180,6 +200,10 @@
         current?.resourceGroupScale ?? DEFAULT_OVERLAY_SIZES.resourceGroupScale,
       textBuffPanelScale:
         current?.textBuffPanelScale ?? DEFAULT_OVERLAY_SIZES.textBuffPanelScale,
+      attrPanelScale:
+        current?.attrPanelScale ?? DEFAULT_OVERLAY_SIZES.attrPanelScale,
+      monsterHealthPanelScale:
+        current?.monsterHealthPanelScale ?? DEFAULT_OVERLAY_SIZES.monsterHealthPanelScale,
       iconBuffSizes: current?.iconBuffSizes ?? {},
     };
   }
@@ -191,6 +215,8 @@
         current?.showSkillCdGroup ?? DEFAULT_OVERLAY_VISIBILITY.showSkillCdGroup,
       showResourceGroup:
         current?.showResourceGroup ?? DEFAULT_OVERLAY_VISIBILITY.showResourceGroup,
+      showAttrPanel:
+        current?.showAttrPanel ?? DEFAULT_OVERLAY_VISIBILITY.showAttrPanel,
     };
   }
 
@@ -222,7 +248,7 @@
       name: group.name ?? "全部 Buff",
       buffIds: [],
       priorityBuffIds: group.priorityBuffIds ?? [],
-      monitorAll: true,
+      monitorAll: group.monitorAll ?? true,
       position: group.position ?? fallbackPosition,
       iconSize: Math.max(24, Math.min(120, group.iconSize ?? 44)),
       columns: Math.max(1, Math.min(12, group.columns ?? 6)),
@@ -567,9 +593,20 @@
   }
 
   $effect(() => {
-    const ids = monitoredBuffIds;
+    const ids = allMonitoredBuffIds;
     if (ids.length === 0) return;
     void loadBuffNames(ids);
+  });
+
+  $effect(() => {
+    const ids = allMonitoredBuffIds;
+    void commands.setMonitoredBuffs(ids);
+  });
+
+  // 当 individualMonitorAllGroup 或 showAllTextBuffs 变化时，更新后端的 monitor_all_buff 状态
+  $effect(() => {
+    const shouldMonitorAll = !!individualMonitorAllGroup?.monitorAll || showAllTextBuffs;
+    void commands.setMonitorAllBuff(shouldMonitorAll);
   });
 
   const groupedIconBuffs = $derived.by(() => {
@@ -598,16 +635,22 @@
 
   const individualModeIconBuffs = $derived.by(() => {
     if (buffDisplayMode !== "individual") return [];
-    if (!individualMonitorAllGroup) return iconDisplayBuffs;
-    const selected = new Set(monitoredBuffIds);
+    if (!individualMonitorAllGroup || !individualMonitorAllGroup.monitorAll) {
+      // 当没有开启"监控全部 Buff"时，只显示 monitoredBuffIds 中的 Buff
+      const selected = new Set(monitoredBuffIds);
+      return iconDisplayBuffs.filter(
+        (buff) => selected.has(buff.baseId) || !!(buff.specialImages && buff.specialImages.length > 0),
+      );
+    }
+    const selected = new Set(allMonitoredBuffIds);
     return iconDisplayBuffs.filter(
       (buff) => selected.has(buff.baseId) || !!(buff.specialImages && buff.specialImages.length > 0),
     );
   });
 
   const individualAllGroupBuffs = $derived.by(() => {
-    if (buffDisplayMode !== "individual" || !individualMonitorAllGroup) return [];
-    const selected = new Set(monitoredBuffIds);
+    if (buffDisplayMode !== "individual" || !individualMonitorAllGroup || !individualMonitorAllGroup.monitorAll) return [];
+    const selected = new Set(allMonitoredBuffIds);
     return iconDisplayBuffs.filter(
       (buff) => !selected.has(buff.baseId) && !(buff.specialImages && buff.specialImages.length > 0),
     );
@@ -646,6 +689,11 @@
         continue;
       }
 
+      // 属性面板专用的 Buff 不在这里显示
+      if (attrPanelBuffIdSet.has(baseId)) {
+        continue;
+      }
+
       const def = buffDefinitions.get(baseId);
       const name = def?.name ?? buffNameMap.get(baseId) ?? `#${baseId}`;
       const timeText = buff.durationMs > 0 ? (remaining / 1000).toFixed(1) : "∞";
@@ -667,13 +715,16 @@
           ...(specialImages.length > 0 ? { specialImages } : {}),
         });
       } else {
-        nextTextBuffs.push({
-          baseId,
-          name,
-          text: timeText,
-          remainPercent,
-          layer: buff.layer,
-        });
+        // 只显示在 monitoredTextBuffIds 中的文字 Buff（如果 showAllTextBuffs 为 false）
+        if (showAllTextBuffs || monitoredTextBuffIds.includes(baseId)) {
+          nextTextBuffs.push({
+            baseId,
+            name,
+            text: timeText,
+            remainPercent,
+            layer: buff.layer,
+          });
+        }
       }
     }
 
@@ -682,7 +733,9 @@
     if (isEditing) {
       const iconIds = new Set(nextIconBuffs.map((buff) => buff.baseId));
       const textIds = new Set(nextTextBuffs.map((buff) => buff.baseId));
-      for (const baseId of monitoredBuffIds) {
+      for (const baseId of allMonitoredBuffIds) {
+        // 属性面板专用的 Buff 不在这里显示
+        if (attrPanelBuffIdSet.has(baseId)) continue;
         if (iconIds.has(baseId) || textIds.has(baseId)) continue;
         const def = buffDefinitions.get(baseId);
         const name = def?.name ?? buffNameMap.get(baseId) ?? `#${baseId}`;
@@ -704,14 +757,17 @@
               : {}),
           });
         } else {
-          nextTextBuffs.push({
-            baseId,
-            name,
-            text: "--",
-            remainPercent: 0,
-            layer: 1,
-            isPlaceholder: true,
-          });
+          // 编辑模式下也只显示在 monitoredTextBuffIds 中的文字 Buff（如果 showAllTextBuffs 为 false）
+          if (showAllTextBuffs || monitoredTextBuffIds.includes(baseId)) {
+            nextTextBuffs.push({
+              baseId,
+              name,
+              text: "--",
+              remainPercent: 0,
+              layer: 1,
+              isPlaceholder: true,
+            });
+          }
         }
       }
     }
@@ -757,6 +813,8 @@
         buffGroups: ensureBuffGroups(profile),
         individualMonitorAllGroup: ensureIndividualMonitorAllGroup(profile),
         textBuffMaxVisible: Math.max(1, Math.min(20, profile.textBuffMaxVisible ?? 10)),
+        showAllTextBuffs: profile.showAllTextBuffs ?? true,
+        monitoredTextBuffIds: profile.monitoredTextBuffIds ?? [],
       }));
     }
 
@@ -802,8 +860,13 @@
       fightResValues = event.payload.fightRes.values;
     });
 
+    // 监听属性更新事件，用于属性面板
+    const unlistenAttr = onAttributeUpdate((event) => {
+      console.log('[game-overlay] 收到属性更新事件:', event.payload.playerAttributes);
+    });
+
     // Preload names for monitored ids so edit mode can show non-active buffs.
-    void loadBuffNames(monitoredBuffIds);
+    void loadBuffNames(allMonitoredBuffIds);
 
     window.addEventListener("pointermove", onGlobalPointerMove);
     window.addEventListener("pointerup", onGlobalPointerUp);
@@ -814,6 +877,7 @@
       unlistenBuff.then((fn) => fn());
       unlisten.then((fn) => fn());
       unlistenRes.then((fn) => fn());
+      unlistenAttr.then((fn) => fn());
       window.removeEventListener("pointermove", onGlobalPointerMove);
       window.removeEventListener("pointerup", onGlobalPointerUp);
       if (rafId) cancelAnimationFrame(rafId);
@@ -964,7 +1028,65 @@
     </div>
   {/if}
 
-  {#if limitedTextBuffs.length > 0}
+  {#if overlayVisibility.showAttrPanel}
+    <div
+      class="overlay-group attr-panel-group"
+      class:editable={isEditing}
+      style:left={`${getGroupPosition("attrPanel").x}px`}
+      style:top={`${getGroupPosition("attrPanel").y}px`}
+      style:transform={`scale(${getGroupScale("attrPanelScale")})`}
+      style:transform-origin="top left"
+      onpointerdown={(e) => startDrag(e, { kind: "group", key: "attrPanel" }, getGroupPosition("attrPanel"))}
+    >
+      {#if isEditing}
+        <div class="group-tag">属性面板</div>
+      {/if}
+      <AttrPanel
+        className={selectedClassKey}
+        editable={isEditing}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+        }}
+        onResizeStart={(e) => {
+          e.stopPropagation();
+          startResize(e, { kind: "group", key: "attrPanelScale" }, getGroupScale("attrPanelScale"));
+        }}
+      />
+      {#if isEditing}
+        <div
+          class="resize-handle"
+          onpointerdown={(e) =>
+            startResize(e, { kind: "group", key: "attrPanelScale" }, getGroupScale("attrPanelScale"))}
+        ></div>
+      {/if}
+    </div>
+  {/if}
+
+  {#if SETTINGS.live.headerCustomization.state.showBossHealth}
+    <div
+      class="overlay-group monster-health-panel-group"
+      class:editable={isEditing}
+      style:left={`${getGroupPosition("monsterHealthPanel").x}px`}
+      style:top={`${getGroupPosition("monsterHealthPanel").y}px`}
+      style:transform={`scale(${getGroupScale("monsterHealthPanelScale")})`}
+      style:transform-origin="top left"
+      onpointerdown={(e) => startDrag(e, { kind: "group", key: "monsterHealthPanel" }, getGroupPosition("monsterHealthPanel"))}
+    >
+      {#if isEditing}
+        <div class="group-tag">怪物血量</div>
+      {/if}
+      <MonsterHealthPanel />
+      {#if isEditing}
+        <div
+          class="resize-handle"
+          onpointerdown={(e) =>
+            startResize(e, { kind: "group", key: "monsterHealthPanelScale" }, getGroupScale("monsterHealthPanelScale"))}
+        ></div>
+      {/if}
+    </div>
+  {/if}
+
+  {#if SETTINGS.skillMonitor.state.enableTextBuff && limitedTextBuffs.length > 0}
     <div
       class="overlay-group text-buff-panel"
       class:editable={isEditing}
@@ -999,54 +1121,187 @@
     </div>
   {/if}
 
-  {#if buffDisplayMode === "grouped"}
-    {#if normalizedBuffGroups.length === 0 && isEditing}
-      <div class="overlay-group grouped-empty-tip" style:left="40px" style:top="310px">
-        请先在技能监控页创建 Buff 分组
-      </div>
-    {/if}
-    {#each normalizedBuffGroups as group (group.id)}
-      {@const groupBuffs = groupedIconBuffs.get(group.id) ?? []}
-      {#if groupBuffs.length > 0 || isEditing}
+  {#if SETTINGS.skillMonitor.state.enableBuff}
+    {#if buffDisplayMode === "grouped"}
+      {#if normalizedBuffGroups.length === 0 && isEditing}
+        <div class="overlay-group grouped-empty-tip" style:left="40px" style:top="310px">
+          请先在技能监控页创建 Buff 分组
+        </div>
+      {/if}
+      {#each normalizedBuffGroups as group (group.id)}
+        {@const groupBuffs = groupedIconBuffs.get(group.id) ?? []}
+        {#if groupBuffs.length > 0 || isEditing}
+          <div
+            class="overlay-group buff-group-container"
+            class:editable={isEditing}
+            style:left={`${group.position.x}px`}
+            style:top={`${group.position.y}px`}
+            onpointerdown={(e) => startDrag(e, { kind: "buffGroup", groupId: group.id }, group.position)}
+          >
+            {#if isEditing}
+              <div class="group-tag">{group.name}{group.monitorAll ? "（全部）" : ""}</div>
+            {/if}
+            {#if groupBuffs.length === 0 && isEditing}
+              <div class="empty-group-hint" style:width={`${group.columns * (group.iconSize + 8)}px`} style:height={`${group.rows * (group.iconSize + 20)}px`}>
+                {#if group.monitorAll}
+                  <span>监控全部 Buff - 等待 Buff 生效</span>
+                {:else}
+                  <span>请在设置中添加 Buff 到此分组</span>
+                {/if}
+              </div>
+            {:else}
+              <div
+                class="buff-group-grid"
+                style:grid-template-columns={`repeat(${Math.max(1, group.columns)}, ${group.iconSize + 8}px)`}
+                style:grid-template-rows={`repeat(${Math.max(1, group.rows)}, auto)`}
+                style:gap={`${Math.max(0, group.gap)}px`}
+              >
+                {#each groupBuffs as buff (buff.baseId)}
+                  <div class="icon-buff-cell" class:placeholder={buff.isPlaceholder} style:width={`${group.iconSize + 8}px`}>
+                    {#if group.showName && !(buff.specialImages && buff.specialImages.length > 0)}
+                      <div class="buff-name-label" style:max-width={`${group.iconSize + 8}px`}>{buff.name.slice(0, 6)}</div>
+                    {/if}
+                    <div class="buff-icon-wrap" style:width={`${group.iconSize}px`} style:height={`${group.iconSize}px`}>
+                      {#if buff.specialImages && buff.specialImages.length > 0}
+                        {#each buff.specialImages as imgSrc (imgSrc)}
+                          <img src={imgSrc} alt={buff.name} class="special-buff-icon" />
+                        {/each}
+                      {:else}
+                        <img
+                          src={`/images/buff/${buff.spriteFile}`}
+                          alt={buff.name}
+                          class="buff-icon"
+                        />
+                      {/if}
+                      {#if group.showLayer && !(buff.specialImages && buff.specialImages.length > 0) && buff.layer > 1}
+                        <div class="layer-badge">{buff.layer}</div>
+                      {/if}
+                    </div>
+                    {#if group.showTime && !(buff.specialImages && buff.specialImages.length > 0)}
+                      <div class="buff-time" style:font-size={`${Math.max(10, Math.round(group.iconSize * 0.26))}px`}>{buff.text}</div>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            {/if}
+            {#if isEditing}
+              <div
+                class="resize-handle icon"
+                onpointerdown={(e) => startResize(e, { kind: "buffGroup", groupId: group.id }, group.iconSize)}
+              ></div>
+            {/if}
+          </div>
+        {/if}
+      {/each}
+
+      {#each specialStandaloneBuffs as buff (buff.baseId)}
+        {@const iconPos = getIconBuffPosition(buff.baseId)}
+        {@const iconSize = getIconBuffSize(buff.baseId)}
+        <div
+          class="overlay-group icon-buff-cell"
+          class:editable={isEditing}
+          class:placeholder={buff.isPlaceholder}
+          style:left={`${iconPos.x}px`}
+          style:top={`${iconPos.y}px`}
+          style:width={`${iconSize + 8}px`}
+          onpointerdown={(e) => startDrag(e, { kind: "iconBuff", baseId: buff.baseId }, iconPos)}
+        >
+          <div class="buff-icon-wrap" style:width={`${iconSize}px`} style:height={`${iconSize}px`}>
+            {#each buff.specialImages ?? [] as imgSrc (imgSrc)}
+              <img src={imgSrc} alt={buff.name} class="special-buff-icon" />
+            {/each}
+          </div>
+          {#if isEditing}
+            <div
+              class="resize-handle icon"
+              onpointerdown={(e) => startResize(e, { kind: "iconBuff", baseId: buff.baseId }, iconSize)}
+            ></div>
+          {/if}
+        </div>
+      {/each}
+    {:else}
+      {#each individualModeIconBuffs as buff (buff.baseId)}
+        {@const iconPos = getIconBuffPosition(buff.baseId)}
+        {@const iconSize = getIconBuffSize(buff.baseId)}
+        <div
+          class="overlay-group icon-buff-cell"
+          class:editable={isEditing}
+          class:placeholder={buff.isPlaceholder}
+          style:left={`${iconPos.x}px`}
+          style:top={`${iconPos.y}px`}
+          style:width={`${iconSize + 8}px`}
+          onpointerdown={(e) => startDrag(e, { kind: "iconBuff", baseId: buff.baseId }, iconPos)}
+        >
+          {#if !(buff.specialImages && buff.specialImages.length > 0)}
+            <div class="buff-name-label" style:max-width={`${iconSize + 8}px`}>{buff.name.slice(0, 6)}</div>
+          {/if}
+          <div class="buff-icon-wrap" style:width={`${iconSize}px`} style:height={`${iconSize}px`}>
+            {#if buff.specialImages && buff.specialImages.length > 0}
+              {#each buff.specialImages as imgSrc (imgSrc)}
+                <img src={imgSrc} alt={buff.name} class="special-buff-icon" />
+              {/each}
+            {:else}
+              <img
+                src={`/images/buff/${buff.spriteFile}`}
+                alt={buff.name}
+                class="buff-icon"
+              />
+            {/if}
+            {#if !(buff.specialImages && buff.specialImages.length > 0) && buff.layer > 1}
+              <div class="layer-badge">{buff.layer}</div>
+            {/if}
+          </div>
+          {#if !(buff.specialImages && buff.specialImages.length > 0)}
+            <div class="buff-time" style:font-size={`${Math.max(10, Math.round(iconSize * 0.26))}px`}>{buff.text}</div>
+          {/if}
+          {#if isEditing}
+            <div
+              class="resize-handle icon"
+              onpointerdown={(e) => startResize(e, { kind: "iconBuff", baseId: buff.baseId }, iconSize)}
+            ></div>
+          {/if}
+        </div>
+      {/each}
+      {#if individualMonitorAllGroup && individualMonitorAllGroup.monitorAll && (individualAllGroupBuffs.length > 0 || isEditing)}
+        {@const maxVisible = Math.max(1, individualMonitorAllGroup.columns * individualMonitorAllGroup.rows)}
         <div
           class="overlay-group buff-group-container"
           class:editable={isEditing}
-          style:left={`${group.position.x}px`}
-          style:top={`${group.position.y}px`}
-          onpointerdown={(e) => startDrag(e, { kind: "buffGroup", groupId: group.id }, group.position)}
+          style:left={`${individualMonitorAllGroup.position.x}px`}
+          style:top={`${individualMonitorAllGroup.position.y}px`}
+          onpointerdown={(e) =>
+            startDrag(
+              e,
+              { kind: "individualAllGroup" },
+              individualMonitorAllGroup.position,
+            )}
         >
           {#if isEditing}
-            <div class="group-tag">{group.name}{group.monitorAll ? "（全部）" : ""}</div>
+            <div class="group-tag">{individualMonitorAllGroup.name}（全部）</div>
           {/if}
           <div
             class="buff-group-grid"
-            style:grid-template-columns={`repeat(${Math.max(1, group.columns)}, ${group.iconSize + 8}px)`}
-            style:grid-template-rows={`repeat(${Math.max(1, group.rows)}, auto)`}
-            style:gap={`${Math.max(0, group.gap)}px`}
+            style:grid-template-columns={`repeat(${Math.max(1, individualMonitorAllGroup.columns)}, ${individualMonitorAllGroup.iconSize + 8}px)`}
+            style:grid-template-rows={`repeat(${Math.max(1, individualMonitorAllGroup.rows)}, auto)`}
+            style:gap={`${Math.max(0, individualMonitorAllGroup.gap)}px`}
           >
-            {#each groupBuffs as buff (buff.baseId)}
-              <div class="icon-buff-cell" class:placeholder={buff.isPlaceholder} style:width={`${group.iconSize + 8}px`}>
-                {#if group.showName && !(buff.specialImages && buff.specialImages.length > 0)}
-                  <div class="buff-name-label" style:max-width={`${group.iconSize + 8}px`}>{buff.name.slice(0, 6)}</div>
+            {#each individualAllGroupBuffs.slice(0, maxVisible) as buff (buff.baseId)}
+              <div class="icon-buff-cell" class:placeholder={buff.isPlaceholder} style:width={`${individualMonitorAllGroup.iconSize + 8}px`}>
+                {#if individualMonitorAllGroup.showName && !(buff.specialImages && buff.specialImages.length > 0)}
+                  <div class="buff-name-label" style:max-width={`${individualMonitorAllGroup.iconSize + 8}px`}>{buff.name.slice(0, 6)}</div>
                 {/if}
-                <div class="buff-icon-wrap" style:width={`${group.iconSize}px`} style:height={`${group.iconSize}px`}>
-                  {#if buff.specialImages && buff.specialImages.length > 0}
-                    {#each buff.specialImages as imgSrc (imgSrc)}
-                      <img src={imgSrc} alt={buff.name} class="special-buff-icon" />
-                    {/each}
-                  {:else}
-                    <img
-                      src={`/images/buff/${buff.spriteFile}`}
-                      alt={buff.name}
-                      class="buff-icon"
-                    />
-                  {/if}
-                  {#if group.showLayer && !(buff.specialImages && buff.specialImages.length > 0) && buff.layer > 1}
+                <div class="buff-icon-wrap" style:width={`${individualMonitorAllGroup.iconSize}px`} style:height={`${individualMonitorAllGroup.iconSize}px`}>
+                  <img
+                    src={`/images/buff/${buff.spriteFile}`}
+                    alt={buff.name}
+                    class="buff-icon"
+                  />
+                  {#if individualMonitorAllGroup.showLayer && buff.layer > 1}
                     <div class="layer-badge">{buff.layer}</div>
                   {/if}
                 </div>
-                {#if group.showTime && !(buff.specialImages && buff.specialImages.length > 0)}
-                  <div class="buff-time" style:font-size={`${Math.max(10, Math.round(group.iconSize * 0.26))}px`}>{buff.text}</div>
+                {#if individualMonitorAllGroup.showTime}
+                  <div class="buff-time" style:font-size={`${Math.max(10, Math.round(individualMonitorAllGroup.iconSize * 0.26))}px`}>{buff.text}</div>
                 {/if}
               </div>
             {/each}
@@ -1054,133 +1309,12 @@
           {#if isEditing}
             <div
               class="resize-handle icon"
-              onpointerdown={(e) => startResize(e, { kind: "buffGroup", groupId: group.id }, group.iconSize)}
+              onpointerdown={(e) =>
+                startResize(e, { kind: "individualAllGroup" }, individualMonitorAllGroup.iconSize)}
             ></div>
           {/if}
         </div>
       {/if}
-    {/each}
-
-    {#each specialStandaloneBuffs as buff (buff.baseId)}
-      {@const iconPos = getIconBuffPosition(buff.baseId)}
-      {@const iconSize = getIconBuffSize(buff.baseId)}
-      <div
-        class="overlay-group icon-buff-cell"
-        class:editable={isEditing}
-        class:placeholder={buff.isPlaceholder}
-        style:left={`${iconPos.x}px`}
-        style:top={`${iconPos.y}px`}
-        style:width={`${iconSize + 8}px`}
-        onpointerdown={(e) => startDrag(e, { kind: "iconBuff", baseId: buff.baseId }, iconPos)}
-      >
-        <div class="buff-icon-wrap" style:width={`${iconSize}px`} style:height={`${iconSize}px`}>
-          {#each buff.specialImages ?? [] as imgSrc (imgSrc)}
-            <img src={imgSrc} alt={buff.name} class="special-buff-icon" />
-          {/each}
-        </div>
-        {#if isEditing}
-          <div
-            class="resize-handle icon"
-            onpointerdown={(e) => startResize(e, { kind: "iconBuff", baseId: buff.baseId }, iconSize)}
-          ></div>
-        {/if}
-      </div>
-    {/each}
-  {:else}
-    {#each individualModeIconBuffs as buff (buff.baseId)}
-      {@const iconPos = getIconBuffPosition(buff.baseId)}
-      {@const iconSize = getIconBuffSize(buff.baseId)}
-      <div
-        class="overlay-group icon-buff-cell"
-        class:editable={isEditing}
-        class:placeholder={buff.isPlaceholder}
-        style:left={`${iconPos.x}px`}
-        style:top={`${iconPos.y}px`}
-        style:width={`${iconSize + 8}px`}
-        onpointerdown={(e) => startDrag(e, { kind: "iconBuff", baseId: buff.baseId }, iconPos)}
-      >
-        {#if !(buff.specialImages && buff.specialImages.length > 0)}
-          <div class="buff-name-label" style:max-width={`${iconSize + 8}px`}>{buff.name.slice(0, 6)}</div>
-        {/if}
-        <div class="buff-icon-wrap" style:width={`${iconSize}px`} style:height={`${iconSize}px`}>
-          {#if buff.specialImages && buff.specialImages.length > 0}
-            {#each buff.specialImages as imgSrc (imgSrc)}
-              <img src={imgSrc} alt={buff.name} class="special-buff-icon" />
-            {/each}
-          {:else}
-            <img
-              src={`/images/buff/${buff.spriteFile}`}
-              alt={buff.name}
-              class="buff-icon"
-            />
-          {/if}
-          {#if !(buff.specialImages && buff.specialImages.length > 0) && buff.layer > 1}
-            <div class="layer-badge">{buff.layer}</div>
-          {/if}
-        </div>
-        {#if !(buff.specialImages && buff.specialImages.length > 0)}
-          <div class="buff-time" style:font-size={`${Math.max(10, Math.round(iconSize * 0.26))}px`}>{buff.text}</div>
-        {/if}
-        {#if isEditing}
-          <div
-            class="resize-handle icon"
-            onpointerdown={(e) => startResize(e, { kind: "iconBuff", baseId: buff.baseId }, iconSize)}
-          ></div>
-        {/if}
-      </div>
-    {/each}
-    {#if individualMonitorAllGroup && (individualAllGroupBuffs.length > 0 || isEditing)}
-      {@const maxVisible = Math.max(1, individualMonitorAllGroup.columns * individualMonitorAllGroup.rows)}
-      <div
-        class="overlay-group buff-group-container"
-        class:editable={isEditing}
-        style:left={`${individualMonitorAllGroup.position.x}px`}
-        style:top={`${individualMonitorAllGroup.position.y}px`}
-        onpointerdown={(e) =>
-          startDrag(
-            e,
-            { kind: "individualAllGroup" },
-            individualMonitorAllGroup.position,
-          )}
-      >
-        {#if isEditing}
-          <div class="group-tag">{individualMonitorAllGroup.name}（全部）</div>
-        {/if}
-        <div
-          class="buff-group-grid"
-          style:grid-template-columns={`repeat(${Math.max(1, individualMonitorAllGroup.columns)}, ${individualMonitorAllGroup.iconSize + 8}px)`}
-          style:grid-template-rows={`repeat(${Math.max(1, individualMonitorAllGroup.rows)}, auto)`}
-          style:gap={`${Math.max(0, individualMonitorAllGroup.gap)}px`}
-        >
-          {#each individualAllGroupBuffs.slice(0, maxVisible) as buff (buff.baseId)}
-            <div class="icon-buff-cell" class:placeholder={buff.isPlaceholder} style:width={`${individualMonitorAllGroup.iconSize + 8}px`}>
-              {#if individualMonitorAllGroup.showName && !(buff.specialImages && buff.specialImages.length > 0)}
-                <div class="buff-name-label" style:max-width={`${individualMonitorAllGroup.iconSize + 8}px`}>{buff.name.slice(0, 6)}</div>
-              {/if}
-              <div class="buff-icon-wrap" style:width={`${individualMonitorAllGroup.iconSize}px`} style:height={`${individualMonitorAllGroup.iconSize}px`}>
-                <img
-                  src={`/images/buff/${buff.spriteFile}`}
-                  alt={buff.name}
-                  class="buff-icon"
-                />
-                {#if individualMonitorAllGroup.showLayer && buff.layer > 1}
-                  <div class="layer-badge">{buff.layer}</div>
-                {/if}
-              </div>
-              {#if individualMonitorAllGroup.showTime}
-                <div class="buff-time" style:font-size={`${Math.max(10, Math.round(individualMonitorAllGroup.iconSize * 0.26))}px`}>{buff.text}</div>
-              {/if}
-            </div>
-          {/each}
-        </div>
-        {#if isEditing}
-          <div
-            class="resize-handle icon"
-            onpointerdown={(e) =>
-              startResize(e, { kind: "individualAllGroup" }, individualMonitorAllGroup.iconSize)}
-          ></div>
-        {/if}
-      </div>
     {/if}
   {/if}
 </div>
@@ -1295,8 +1429,23 @@
     text-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
   }
 
+  .empty-group-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: rgba(30, 30, 30, 0.6);
+    border: 1px dashed rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 11px;
+    text-align: center;
+    padding: 8px;
+  }
+
   .skill-group.editable,
   .resource-group.editable,
+  .attr-panel-group.editable,
+  .monster-health-panel-group.editable,
   .text-buff-panel.editable {
     border: 2px solid rgba(102, 204, 255, 0.9);
     border-radius: 10px;

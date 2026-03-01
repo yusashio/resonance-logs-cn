@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <vector>
 #include <string>
+#include <chrono>
 #include <algorithm>
 #include <cstring>
 #include <queue>
@@ -125,7 +126,8 @@ extern "C" int GpuStrategyEnumerationOpenCL(
     int min_attr_count,
     int max_solutions,
     int *result_scores,
-    long long *result_indices) {
+    long long *result_indices_low,
+    long long *result_indices_high) {
     cl_platform_id platform = nullptr;
     cl_device_id device = nullptr;
     if (!SelectDiscreteGpu(platform, device)) {
@@ -153,7 +155,7 @@ extern "C" int GpuStrategyEnumerationOpenCL(
         for (unsigned long long i = 0; i < r; ++i) res = (res * (n - i)) / (i + 1ULL); 
         return res;
     };
-    unsigned long long total_combinations = comb_count((unsigned long long)module_count, 4ULL);
+    unsigned long long total_combinations = comb_count((unsigned long long)module_count, 5ULL);
     CalculateOptimalParamsOpenCL(&gpu_config, total_combinations);
 
     printf("OpenCL GPU Configuration:\n");
@@ -193,7 +195,7 @@ ulong comb_count(ulong n, ulong r) {
     ulong res = 1UL; for (ulong i = 0; i < r; ++i) { res = (res * (n - i)) / (i + 1UL); } return res;
 }
 
-void get_combination_by_index(uint n, uint r, ulong idx, uint comb_out[4]) {
+void get_combination_by_index(uint n, uint r, ulong idx, uint comb_out[5]) {
     ulong remaining = idx;
     for (uint i = 0; i < r; ++i) {
         uint start = (i == 0U) ? 0U : (comb_out[i-1] + 1U);
@@ -205,7 +207,7 @@ void get_combination_by_index(uint n, uint r, ulong idx, uint comb_out[4]) {
     }
 }
 
-int next_combination(uint n, uint r, uint comb[4]) {
+int next_combination(uint n, uint r, uint comb[5]) {
     for (int pos = (int)r - 1; pos >= 0; --pos) {
         uint limit = n - r + (uint)pos;
         if (comb[pos] < limit) {
@@ -236,7 +238,8 @@ __kernel void score_range(
     ulong range_start,
     ulong range_len,
     __global int * restrict out_scores,
-    __global ulong * restrict out_indices) {
+    __global ulong * restrict out_indices_low,
+    __global ulong * restrict out_indices_high) {
     ulong gid = (ulong)get_global_id(0);
     ulong total_threads = (ulong)get_global_size(0);
     
@@ -249,19 +252,19 @@ __kernel void score_range(
     ulong seg_end = seg_start + work_per_thread;
     if (seg_end > range_start + range_len) seg_end = range_start + range_len;
     
-    uint comb[4];
-    get_combination_by_index((uint)module_count, 4U, seg_start, comb);
+    uint comb[5];
+    get_combination_by_index((uint)module_count, 5U, seg_start, comb);
     
     for (ulong combo_idx = seg_start; combo_idx < seg_end; ++combo_idx) {
         ulong gid_local = combo_idx - range_start;
 
-        int attr_ids[20];
-        int attr_vals[20];
+        int attr_ids[25];
+        int attr_vals[25];
         int attr_cnt = 0;
         int total_attr_value = 0;
         
         #pragma unroll
-        for (int t = 0; t < 4; ++t) {
+        for (int t = 0; t < 5; ++t) {
             int mi = (int)comb[t];
             int off = module_offsets[mi];
             int cnt = module_attr_counts[mi];
@@ -274,11 +277,11 @@ __kernel void score_range(
                     total_attr_value += aval;
                     int found = -1;
                     #pragma unroll
-                    for (int u = 0; u < 12; ++u) { 
+                    for (int u = 0; u < 15; ++u) { 
                         if (u < attr_cnt && attr_ids[u] == aid) { found = u; break; } 
                     }
                     if (found >= 0) { attr_vals[found] += aval; }
-                    else if (attr_cnt < 12) { attr_ids[attr_cnt] = aid; attr_vals[attr_cnt] = aval; attr_cnt++; }
+                    else if (attr_cnt < 15) { attr_ids[attr_cnt] = aid; attr_vals[attr_cnt] = aval; attr_cnt++; }
                 }
             }
         }
@@ -289,7 +292,7 @@ __kernel void score_range(
             int req_v = min_attr_values[m];
             int sum_v = 0, ok = 0;
             #pragma unroll
-            for (int u = 0; u < 12; ++u) {
+            for (int u = 0; u < 15; ++u) {
                 if (u < attr_cnt && attr_ids[u] == req_id) { sum_v = attr_vals[u]; ok = 1; break; }
             }
             if (!ok || sum_v < req_v) {
@@ -300,8 +303,9 @@ __kernel void score_range(
         
         if (!pass_min_filter) {
             out_scores[gid_local] = 0;
-            out_indices[gid_local] = 0UL;
-            if (!next_combination((uint)module_count, 4U, comb)) {
+            out_indices_low[gid_local] = 0UL;
+            out_indices_high[gid_local] = 0UL;
+            if (!next_combination((uint)module_count, 5U, comb)) {
                 break;
             }
             continue;
@@ -309,7 +313,7 @@ __kernel void score_range(
 
         int threshold_power = 0;
         #pragma unroll
-        for (int i = 0; i < 12; ++i) {
+        for (int i = 0; i < 15; ++i) {
             if (i < attr_cnt) {
                 int aval = attr_vals[i];
                 int aid = attr_ids[i];
@@ -327,9 +331,11 @@ __kernel void score_range(
         int idx_total = total_attr_value > 120 ? 120 : total_attr_value;
         int total_power = threshold_power + TOTAL_ATTR_POWER_VALUES[idx_total];
         out_scores[gid_local] = total_power;
-        out_indices[gid_local] = ((ulong)comb[0]) | ((ulong)comb[1] << 16) | ((ulong)comb[2] << 32) | ((ulong)comb[3] << 48);
+        // 将5个索引打包到两个ulong中
+        out_indices_low[gid_local] = ((ulong)comb[0]) | ((ulong)comb[1] << 16) | ((ulong)comb[2] << 32) | ((ulong)comb[3] << 48);
+        out_indices_high[gid_local] = (ulong)comb[4];
         
-        if (!next_combination((uint)module_count, 4U, comb)) {
+        if (!next_combination((uint)module_count, 5U, comb)) {
             break;
         }
     }
@@ -385,11 +391,13 @@ __kernel void flag_scores_by_threshold(
 
 __kernel void compact_selected(
     __global const int * restrict scores,
-    __global const ulong * restrict indices,
+    __global const ulong * restrict indices_low,
+    __global const ulong * restrict indices_high,
     __global const uchar * restrict flags,
     ulong n,
     __global int * restrict out_scores,
-    __global ulong * restrict out_indices,
+    __global ulong * restrict out_indices_low,
+    __global ulong * restrict out_indices_high,
     __global uint * restrict out_count) {
     size_t gid = get_global_id(0);
     size_t gsz = get_global_size(0);
@@ -397,7 +405,8 @@ __kernel void compact_selected(
         if (flags[i]) {
             uint pos = (uint)atomic_inc((volatile __global int *)out_count);
             out_scores[pos] = scores[i];
-            out_indices[pos] = indices[i];
+            out_indices_low[pos] = indices_low[i];
+            out_indices_high[pos] = indices_high[i];
         }
     }
 }
@@ -444,7 +453,7 @@ __kernel void compact_selected(
         return 0;
     }
 
-    struct Item { int score; unsigned long long idx; bool operator<(const Item& o) const { return score > o.score; } };
+    struct Item { int score; unsigned long long idx_low; unsigned long long idx_high; bool operator<(const Item& o) const { return score > o.score; } };
     std::priority_queue<Item> topk;
 
     unsigned long long processed = 0ULL;
@@ -453,7 +462,8 @@ __kernel void compact_selected(
         size_t outN = (size_t)batch;
 
         cl_mem d_scores = clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(int) * outN, nullptr, &err);
-        cl_mem d_indices = clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(unsigned long long) * outN, nullptr, &err);
+        cl_mem d_indices_low = clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(unsigned long long) * outN, nullptr, &err);
+        cl_mem d_indices_high = clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(unsigned long long) * outN, nullptr, &err);
 
         int arg = 0;
         clSetKernelArg(kernel, arg++, sizeof(cl_mem), &d_attr_ids);
@@ -474,7 +484,8 @@ __kernel void compact_selected(
         cl_ulong range_len = (cl_ulong)batch;
         clSetKernelArg(kernel, arg++, sizeof(unsigned long long), &range_len);
         clSetKernelArg(kernel, arg++, sizeof(cl_mem), &d_scores);
-        clSetKernelArg(kernel, arg++, sizeof(cl_mem), &d_indices);
+        clSetKernelArg(kernel, arg++, sizeof(cl_mem), &d_indices_low);
+        clSetKernelArg(kernel, arg++, sizeof(cl_mem), &d_indices_high);
 
         size_t lsz = gpu_config.optimal_local_size;
         size_t target_threads = gpu_config.optimal_global_size;
@@ -484,12 +495,12 @@ __kernel void compact_selected(
         size_t gsz = target_threads;
         
         err = clEnqueueNDRangeKernel(q, kernel, 1, nullptr, &gsz, &lsz, 0, nullptr, nullptr);
-        if (err != CL_SUCCESS) { clReleaseMemObject(d_indices); clReleaseMemObject(d_scores); break; }
+        if (err != CL_SUCCESS) { clReleaseMemObject(d_indices_high); clReleaseMemObject(d_indices_low); clReleaseMemObject(d_scores); break; }
         clFinish(q);
 
         cl_ulong n64 = (cl_ulong)outN;
         cl_mem d_hist = clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(cl_uint) * 256, nullptr, &err);
-        if (!d_hist || err != CL_SUCCESS) { clReleaseMemObject(d_indices); clReleaseMemObject(d_scores); break; }
+        if (!d_hist || err != CL_SUCCESS) { clReleaseMemObject(d_indices_high); clReleaseMemObject(d_indices_low); clReleaseMemObject(d_scores); break; }
         
         cl_uint prefix_mask = 0U;
         cl_uint prefix_value = 0U;
@@ -509,7 +520,7 @@ __kernel void compact_selected(
             clSetKernelArg(k_hist_radix, harg++, sizeof(cl_uint) * 256, nullptr);
             
             err = clEnqueueNDRangeKernel(q, k_hist_radix, 1, nullptr, &gsz, &lsz, 0, nullptr, nullptr);
-            if (err != CL_SUCCESS) { clReleaseMemObject(d_hist); clReleaseMemObject(d_indices); clReleaseMemObject(d_scores); break; }
+            if (err != CL_SUCCESS) { clReleaseMemObject(d_hist); clReleaseMemObject(d_indices_high); clReleaseMemObject(d_indices_low); clReleaseMemObject(d_scores); break; }
             clFinish(q);
             
             cl_uint h_hist[256];
@@ -538,45 +549,52 @@ __kernel void compact_selected(
         clReleaseMemObject(d_hist);
 
         cl_mem d_flags = clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(unsigned char) * outN, nullptr, &err);
-        if (!d_flags || err != CL_SUCCESS) { clReleaseMemObject(d_indices); clReleaseMemObject(d_scores); break; }
+        if (!d_flags || err != CL_SUCCESS) { clReleaseMemObject(d_indices_high); clReleaseMemObject(d_indices_low); clReleaseMemObject(d_scores); break; }
         int farg = 0;
         clSetKernelArg(k_flag, farg++, sizeof(cl_mem), &d_scores);
         clSetKernelArg(k_flag, farg++, sizeof(cl_ulong), &n64);
         clSetKernelArg(k_flag, farg++, sizeof(int), &threshold_value);
         clSetKernelArg(k_flag, farg++, sizeof(cl_mem), &d_flags);
         err = clEnqueueNDRangeKernel(q, k_flag, 1, nullptr, &gsz, &lsz, 0, nullptr, nullptr);
-        if (err != CL_SUCCESS) { clReleaseMemObject(d_flags); clReleaseMemObject(d_indices); clReleaseMemObject(d_scores); break; }
+        if (err != CL_SUCCESS) { clReleaseMemObject(d_flags); clReleaseMemObject(d_indices_high); clReleaseMemObject(d_indices_low); clReleaseMemObject(d_scores); break; }
         clFinish(q);
 
         cl_mem d_selected_count = clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(cl_uint), nullptr, &err);
         cl_uint zero_u = 0;
         clEnqueueWriteBuffer(q, d_selected_count, CL_TRUE, 0, sizeof(cl_uint), &zero_u, 0, nullptr, nullptr);
         cl_mem d_comp_scores = clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(int) * outN, nullptr, &err);
-        cl_mem d_comp_indices = clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(unsigned long long) * outN, nullptr, &err);
-        if (!d_comp_scores || !d_comp_indices || err != CL_SUCCESS) {
-            if (d_comp_indices) clReleaseMemObject(d_comp_indices);
+        cl_mem d_comp_indices_low = clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(unsigned long long) * outN, nullptr, &err);
+        cl_mem d_comp_indices_high = clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(unsigned long long) * outN, nullptr, &err);
+        if (!d_comp_scores || !d_comp_indices_low || !d_comp_indices_high || err != CL_SUCCESS) {
+            if (d_comp_indices_high) clReleaseMemObject(d_comp_indices_high);
+            if (d_comp_indices_low) clReleaseMemObject(d_comp_indices_low);
             if (d_comp_scores) clReleaseMemObject(d_comp_scores);
             clReleaseMemObject(d_selected_count);
             clReleaseMemObject(d_flags);
-            clReleaseMemObject(d_indices);
+            clReleaseMemObject(d_indices_high);
+            clReleaseMemObject(d_indices_low);
             clReleaseMemObject(d_scores);
             break;
         }
         int carg = 0;
         clSetKernelArg(k_compact, carg++, sizeof(cl_mem), &d_scores);
-        clSetKernelArg(k_compact, carg++, sizeof(cl_mem), &d_indices);
+        clSetKernelArg(k_compact, carg++, sizeof(cl_mem), &d_indices_low);
+        clSetKernelArg(k_compact, carg++, sizeof(cl_mem), &d_indices_high);
         clSetKernelArg(k_compact, carg++, sizeof(cl_mem), &d_flags);
         clSetKernelArg(k_compact, carg++, sizeof(cl_ulong), &n64);
         clSetKernelArg(k_compact, carg++, sizeof(cl_mem), &d_comp_scores);
-        clSetKernelArg(k_compact, carg++, sizeof(cl_mem), &d_comp_indices);
+        clSetKernelArg(k_compact, carg++, sizeof(cl_mem), &d_comp_indices_low);
+        clSetKernelArg(k_compact, carg++, sizeof(cl_mem), &d_comp_indices_high);
         clSetKernelArg(k_compact, carg++, sizeof(cl_mem), &d_selected_count);
         err = clEnqueueNDRangeKernel(q, k_compact, 1, nullptr, &gsz, &lsz, 0, nullptr, nullptr);
         if (err != CL_SUCCESS) {
-            clReleaseMemObject(d_comp_indices);
+            clReleaseMemObject(d_comp_indices_high);
+            clReleaseMemObject(d_comp_indices_low);
             clReleaseMemObject(d_comp_scores);
             clReleaseMemObject(d_selected_count);
             clReleaseMemObject(d_flags);
-            clReleaseMemObject(d_indices);
+            clReleaseMemObject(d_indices_high);
+            clReleaseMemObject(d_indices_low);
             clReleaseMemObject(d_scores);
             break;
         }
@@ -589,24 +607,28 @@ __kernel void compact_selected(
         if (h_selected > 0) {
             size_t selN = (size_t)h_selected;
             std::vector<int> h_scores_sel(selN);
-            std::vector<unsigned long long> h_indices_sel(selN);
+            std::vector<unsigned long long> h_indices_low_sel(selN);
+            std::vector<unsigned long long> h_indices_high_sel(selN);
             clEnqueueReadBuffer(q, d_comp_scores, CL_TRUE, 0, sizeof(int) * selN, h_scores_sel.data(), 0, nullptr, nullptr);
-            clEnqueueReadBuffer(q, d_comp_indices, CL_TRUE, 0, sizeof(unsigned long long) * selN, h_indices_sel.data(), 0, nullptr, nullptr);
+            clEnqueueReadBuffer(q, d_comp_indices_low, CL_TRUE, 0, sizeof(unsigned long long) * selN, h_indices_low_sel.data(), 0, nullptr, nullptr);
+            clEnqueueReadBuffer(q, d_comp_indices_high, CL_TRUE, 0, sizeof(unsigned long long) * selN, h_indices_high_sel.data(), 0, nullptr, nullptr);
             clFinish(q);
 
             for (size_t i = 0; i < selN; ++i) {
                 int sc = h_scores_sel[i];
                 if (sc < 0) continue;
-                if (topk.size() < (size_t)max_solutions) { topk.push(Item{sc, h_indices_sel[i]}); }
-                else if (sc > topk.top().score) { topk.pop(); topk.push(Item{sc, h_indices_sel[i]}); }
+                if (topk.size() < (size_t)max_solutions) { topk.push(Item{sc, h_indices_low_sel[i], h_indices_high_sel[i]}); }
+                else if (sc > topk.top().score) { topk.pop(); topk.push(Item{sc, h_indices_low_sel[i], h_indices_high_sel[i]}); }
             }
         }
 
-        clReleaseMemObject(d_comp_indices);
+        clReleaseMemObject(d_comp_indices_high);
+        clReleaseMemObject(d_comp_indices_low);
         clReleaseMemObject(d_comp_scores);
         clReleaseMemObject(d_selected_count);
         clReleaseMemObject(d_flags);
-        clReleaseMemObject(d_indices);
+        clReleaseMemObject(d_indices_high);
+        clReleaseMemObject(d_indices_low);
         clReleaseMemObject(d_scores);
 
         processed += batch;
@@ -616,7 +638,11 @@ __kernel void compact_selected(
     while (!topk.empty()) { items.push_back(topk.top()); topk.pop(); }
     std::sort(items.begin(), items.end(), [](const Item& a, const Item& b){ return a.score > b.score; });
     int out_count = (int)std::min(items.size(), (size_t)max_solutions);
-    for (int i = 0; i < out_count; ++i) { result_scores[i] = items[i].score; result_indices[i] = (long long)items[i].idx; }
+    for (int i = 0; i < out_count; ++i) {
+        result_scores[i] = items[i].score;
+        result_indices_low[i] = (long long)items[i].idx_low;
+        result_indices_high[i] = (long long)items[i].idx_high;
+    }
 
     if (d_min_vals) clReleaseMemObject(d_min_vals);
     if (d_min_ids) clReleaseMemObject(d_min_ids);
@@ -645,6 +671,7 @@ std::vector<ModuleSolution> ModuleOptimizerCpp::StrategyEnumerationOpenCL(
                                    min_attr_sum_requirements, max_solutions, max_workers);
     }
 
+    auto start_time = std::chrono::high_resolution_clock::now();
     printf("OpenCL GPU acceleration enabled - all calculations performed on GPU\n");
 
     std::vector<int> all_attr_ids;
@@ -673,7 +700,8 @@ std::vector<ModuleSolution> ModuleOptimizerCpp::StrategyEnumerationOpenCL(
     }
 
     std::vector<int> gpu_scores(max_solutions);
-    std::vector<long long> gpu_indices(max_solutions);
+    std::vector<long long> gpu_indices_low(max_solutions);
+    std::vector<long long> gpu_indices_high(max_solutions);
 
     int gpu_result_count = 0;
 #ifdef USE_OPENCL
@@ -693,24 +721,37 @@ std::vector<ModuleSolution> ModuleOptimizerCpp::StrategyEnumerationOpenCL(
         static_cast<int>(min_attr_ids.size()),
         max_solutions,
         gpu_scores.data(),
-        gpu_indices.data());
+        gpu_indices_low.data(),
+        gpu_indices_high.data());
 #endif
 
     std::vector<ModuleSolution> final_solutions;
     final_solutions.reserve(static_cast<size_t>(gpu_result_count));
     for (int i = 0; i < gpu_result_count; ++i) {
-        long long packed = gpu_indices[i];
+        unsigned long long idx_low = static_cast<unsigned long long>(gpu_indices_low[i]);
+        unsigned long long idx_high = static_cast<unsigned long long>(gpu_indices_high[i]);
         std::vector<ModuleInfo> solution_modules;
-        solution_modules.reserve(4);
+        solution_modules.reserve(5);
+        // 从 idx_low 解包前 4 个索引
         for (int j = 0; j < 4; ++j) {
-            size_t module_idx = static_cast<size_t>((packed >> (j * 16)) & 0xFFFF);
+            size_t module_idx = static_cast<size_t>((idx_low >> (j * 16)) & 0xFFFFULL);
             if (module_idx < modules.size()) {
                 solution_modules.push_back(modules[module_idx]);
             }
         }
+        // 从 idx_high 解包第 5 个索引
+        size_t module_idx_5 = static_cast<size_t>(idx_high & 0xFFFFULL);
+        if (module_idx_5 < modules.size()) {
+            solution_modules.push_back(modules[module_idx_5]);
+        }
         auto result = CalculateCombatPower(solution_modules);
         final_solutions.emplace_back(solution_modules, gpu_scores[i], result.second);
     }
+    
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+    printf("OpenCL GPU calculation completed in %lld ms\n", duration.count());
+    
     return final_solutions;
 #else
     (void)modules; (void)target_attributes; (void)exclude_attributes; (void)min_attr_sum_requirements; (void)max_solutions; (void)max_workers;

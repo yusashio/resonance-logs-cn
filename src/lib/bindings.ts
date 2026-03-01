@@ -159,6 +159,17 @@ async getAvailableBuffs() : Promise<Result<BuffDefinition[], string>> {
 }
 },
 /**
+ * Returns all buffs (including those without sprites).
+ */
+async getAllBuffs() : Promise<Result<BuffDefinition[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_all_buffs") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Returns display names for requested buff ids, including buffs without sprite images.
  */
 async getBuffNames(baseIds: number[]) : Promise<Result<BuffNameInfo[], string>> {
@@ -191,6 +202,17 @@ async setMonitorAllBuff(monitorAllBuff: boolean) : Promise<Result<null, string>>
 async setBuffPriority(priorityBuffIds: number[]) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_buff_priority", { priorityBuffIds }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 获取实体血量信息
+ */
+async getEntityHealth() : Promise<Result<EntityHealth[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_entity_health") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -466,9 +488,9 @@ async getLatestModules() : Promise<Result<ModuleInfo[], string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async optimizeLatestModules(targetAttributes: number[], excludeAttributes: number[], minAttrRequirements: Partial<{ [key in number]: number }> | null, useGpu: boolean | null) : Promise<Result<ModuleSolution[], string>> {
+async optimizeLatestModules(targetAttributes: number[], excludeAttributes: number[], minAttrRequirements: Partial<{ [key in number]: number }> | null, useGpu: boolean | null, minModuleScore: number | null) : Promise<Result<ModuleSolution[], string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("optimize_latest_modules", { targetAttributes, excludeAttributes, minAttrRequirements, useGpu }) };
+    return { status: "ok", data: await TAURI_INVOKE("optimize_latest_modules", { targetAttributes, excludeAttributes, minAttrRequirements, useGpu, minModuleScore }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -518,7 +540,7 @@ maxHp: number | null;
  * Whether the boss was defeated.
  */
 isDefeated: boolean }
-export type BuffDefinition = { baseId: number; name: string; spriteFile: string; searchKeywords: string[] }
+export type BuffDefinition = { baseId: number; name: string; spriteFile: string; talentName: string | null; talentSpriteFile: string | null; searchKeywords: string[] }
 export type BuffNameInfo = { baseId: number; name: string; hasSpriteFile: boolean }
 export type CombatState = "idle" | "inCombat"
 /**
@@ -614,11 +636,23 @@ remoteEncounterId: number | null;
  * Whether the encounter is favorited.
  */
 isFavorite: boolean }
+/**
+ * 实体血量信息
+ */
+export type EntityHealth = { uid: number; name: string; currentHp: number | null; maxHp: number | null; monsterTypeId: number | null; entityType: number }
 export type GpuSupport = { cuda_available: boolean; opencl_available: boolean }
 export type HistoryEntityData = { uid: number; name: string; classId: number; classSpec: number; className: string; classSpecName: string; abilityScore: number; damage: RawCombatStats; damageBossOnly: RawCombatStats; healing: RawCombatStats; taken: RawCombatStats; activeDmgTimeMs: number; dmgSkills: Partial<{ [key in number]: RawSkillStats }>; healSkills: Partial<{ [key in number]: RawSkillStats }>; takenSkills: Partial<{ [key in number]: RawSkillStats }>; dmgPerTarget: PerTargetStats[]; healPerTarget: PerTargetStats[] }
 export type ModuleInfo = { name: string; config_id: number; uuid: number; quality: number; parts: ModulePart[] }
 export type ModulePart = { id: number; name: string; value: number }
 export type ModuleSolution = { modules: ModuleInfo[]; score: number; attr_breakdown: Partial<{ [key in string]: number }> }
+/**
+ * 敌人统计数据 - 按目标ID聚合的伤害统计
+ */
+export type MonsterStats = { targetId: number; targetName: string | null; targetMonsterTypeId: number | null; isBoss: boolean; hitCount: number; totalDamage: number; 
+/**
+ * 最后一次被攻击的时间戳（毫秒）
+ */
+lastHitAtMs: number }
 export type PerTargetStats = { targetUid: number; targetName: string; totalValue: number; damage: RawCombatStats; skills: Partial<{ [key in number]: RawSkillStats }> }
 /**
  * The result of a query for player names.
@@ -657,7 +691,11 @@ export type Segment = { id: number; segmentType: SegmentType;
 /**
  * Primary boss entity ID (first one seen) - kept for backwards compatibility
  */
-bossEntityId: number | null; bossMonsterTypeId: number | null; bossName: string | null; startedAtMs: number; endedAtMs: number | null; totalDamage: number; hitCount: number; events: DamageEvent[] }
+bossEntityId: number | null; bossMonsterTypeId: number | null; bossName: string | null; startedAtMs: number; endedAtMs: number | null; totalDamage: number; hitCount: number; events: DamageEvent[]; 
+/**
+ * 按敌人ID聚合的统计数据
+ */
+monsterStats: MonsterStats[] }
 export type SegmentType = "boss" | "trash"
 
 /** tauri-specta globals **/

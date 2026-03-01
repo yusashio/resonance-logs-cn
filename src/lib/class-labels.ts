@@ -1,16 +1,16 @@
 const CLASS_LABELS_ZH: Record<string, string> = {
   "Heavy Guardian": "巨刃守护者",
   "Shield Knight": "神盾骑士",
-  Stormblade: "雷影剑士",
+  "Stormblade": "雷影剑士",
   "Wind Knight": "青岚骑士",
-  Marksman: "神射手",
+  "Marksman": "神射手",
   "Frost Mage": "冰魔导师",
   "Verdant Oracle": "森语者",
   "Beat Performer": "灵魂乐手",
 };
 
 const SPEC_LABELS_ZH: Record<string, string> = {
-  Earthfort: "岩盾",
+  "Earthfort": "岩盾",
   Block: "格挡",
   Iaido: "太刀",
   "Iaido Slash": "太刀",

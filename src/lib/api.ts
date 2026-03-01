@@ -10,10 +10,10 @@ import type {
   Result,
   RawCombatStats as BindingRawCombatStats,
   RawSkillStats as BindingRawSkillStats,
-  RawEntityData as BindingRawEntityData,
+  HistoryEntityData as BindingHistoryEntityData,
 } from "./bindings";
 
-// Type definitions for event payloads
+export type RawEntityData = BindingHistoryEntityData;
 export type BossHealth = {
   uid: number;
   name: string;
@@ -71,6 +71,11 @@ export type SkillRow = {
   luckyDmgRate: number;
   hits: number;
   hitsPerMinute: number
+};
+
+export type SkillsWindow = {
+  currPlayer: PlayerRow[];
+  skillRows: SkillRow[]
 };
 
 export type SkillCdState = {
@@ -173,6 +178,15 @@ export type DamageEvent = {
   isKillingBlow: boolean;
 };
 
+export type MonsterStats = {
+  targetId: number;
+  targetName: string | null;
+  targetMonsterTypeId: number | null;
+  isBoss: boolean;
+  hitCount: number;
+  totalDamage: number;
+};
+
 export type Segment = {
   id: number;
   segmentType: 'boss' | 'trash';
@@ -184,6 +198,7 @@ export type Segment = {
   totalDamage: number;
   hitCount: number;
   events: DamageEvent[];
+  monsterStats: MonsterStats[];
 };
 
 export type DungeonLog = {
@@ -193,12 +208,56 @@ export type DungeonLog = {
   segments: Segment[];
 };
 
+export type EntityHealth = {
+  uid: number;
+  name: string;
+  currentHp: number | null;
+  maxHp: number | null;
+  monsterTypeId: number | null;
+  entityType: number;
+};
+
+export type DungeonReviveInfo = {
+  reviveIds: number[];
+  reviveMap: Record<number, number>;
+};
+
+export type DungeonReviveUpdatePayload = {
+  reviveInfo: DungeonReviveInfo;
+};
+
+export const getEntityHealth = (): Promise<Result<EntityHealth[], string>> =>
+  commands.getEntityHealth();
+
+export type MetricType = "dps" | "heal" | "tanked";
+
+export type PlayersUpdatePayload = {
+  metricType: MetricType;
+  playersWindow: PlayersWindow;
+};
+
+export type SkillsUpdatePayload = {
+  metricType: MetricType;
+  playerUid: number;
+  skillsWindow: SkillsWindow;
+};
+
+export type PlayerMetricsResetPayload = {
+  segmentName?: string | null;
+};
+
 // Event listener functions
 export const onEncounterUpdate = (handler: (event: Event<EncounterUpdatePayload>) => void): Promise<UnlistenFn> =>
   listen<EncounterUpdatePayload>("encounter-update", handler);
 
 export const onLiveData = (handler: (event: Event<LiveDataPayload>) => void): Promise<UnlistenFn> =>
   listen<LiveDataPayload>("live-data", handler);
+
+export const onPlayersUpdate = (handler: (event: Event<PlayersUpdatePayload>) => void): Promise<UnlistenFn> =>
+  listen<PlayersUpdatePayload>("players-update", handler);
+
+export const onSkillsUpdate = (handler: (event: Event<SkillsUpdatePayload>) => void): Promise<UnlistenFn> =>
+  listen<SkillsUpdatePayload>("skills-update", handler);
 
 export const onBossDeath = (handler: (event: Event<BossDeathPayload>) => void): Promise<UnlistenFn> =>
   listen<BossDeathPayload>("boss-death", handler);
@@ -209,8 +268,23 @@ export const onSceneChange = (handler: (event: Event<SceneChangePayload>) => voi
 export const onDungeonLogUpdate = (handler: (event: Event<DungeonLog>) => void): Promise<UnlistenFn> =>
   listen<DungeonLog>("log-update", handler);
 
+// Convenience: factory to create metric-filtered listeners
+export const makeSkillsUpdateFilter =
+  (metric: MetricType) =>
+    (handler: (event: Event<SkillsUpdatePayload>) => void): Promise<UnlistenFn> =>
+      listen<SkillsUpdatePayload>("skills-update", (event) => {
+        if (event.payload.metricType === metric) handler(event);
+      });
+
+export const onDpsSkillsUpdate = makeSkillsUpdateFilter("dps");
+export const onHealSkillsUpdate = makeSkillsUpdateFilter("heal");
+export const onTankedSkillsUpdate = makeSkillsUpdateFilter("tanked");
+
 export const onResetEncounter = (handler: () => void): Promise<UnlistenFn> =>
   listen("reset-encounter", handler);
+
+export const onResetPlayerMetrics = (handler: (event: Event<PlayerMetricsResetPayload>) => void): Promise<UnlistenFn> =>
+  listen<PlayerMetricsResetPayload>("reset-player-metrics", handler);
 
 export const onPauseEncounter = (handler: (event: Event<boolean>) => void): Promise<UnlistenFn> =>
   listen<boolean>("pause-encounter", handler);
@@ -237,10 +311,15 @@ export const onBuffUpdateAll = (
   handler: (event: Event<BuffUpdatePayload>) => void
 ): Promise<UnlistenFn> => listen<BuffUpdatePayload>("buff-update-all", handler);
 
+export const onDungeonReviveInfoUpdate = (
+  handler: (event: Event<DungeonReviveInfo>) => void
+): Promise<UnlistenFn> => listen<DungeonReviveInfo>("dungeon-revive-info-update", handler);
+
 // Command wrappers (still using generated bindings)
 
 export const resetEncounter = (): Promise<Result<null, string>> => commands.resetEncounter();
 export const togglePauseEncounter = (): Promise<Result<null, string>> => commands.togglePauseEncounter();
+export const resetPlayerMetrics = (): Promise<Result<null, string>> => commands.resetPlayerMetrics();
 export const enableBlur = (): Promise<void> => commands.enableBlur();
 export const disableBlur = (): Promise<void> => commands.disableBlur();
 export const getEncounterEntitiesRaw = (
@@ -249,15 +328,17 @@ export const getEncounterEntitiesRaw = (
   commands.getEncounterEntitiesRaw(encounterId);
 
 // New: toggle boss-only DPS filtering on the backend
-export const setBossOnlyDps = (enabled: boolean): Promise<void> => invoke("set_boss_only_dps", { enabled });
+export const setBossOnlyDps = (enabled: boolean): Promise<Result<null, string>> =>
+  commands.setBossOnlyDps(enabled);
 
-// export const setDungeonSegmentsEnabled = (enabled: boolean): Promise<void> =>
-//   invoke("set_dungeon_segments_enabled", { enabled });
+export const setDungeonSegmentsEnabled = (enabled: boolean): Promise<Result<null, string>> =>
+  commands.setDungeonSegmentsEnabled(enabled);
 
-export const setEventUpdateRateMs = (rateMs: number): Promise<void> =>
-  invoke("set_event_update_rate_ms", { rateMs });
+export const setEventUpdateRateMs = (rateMs: number): Promise<Result<null, string>> =>
+  commands.setEventUpdateRateMs(rateMs);
 
-export const getDungeonLog = (): Promise<DungeonLog> => invoke("get_dungeon_log");
+export const getDungeonLog = (): Promise<Result<DungeonLog, string>> =>
+  commands.getDungeonLog();
 
 // =========================
 // 模组计算器相关 API
@@ -288,6 +369,7 @@ export type OptimizeLatestPayload = {
   excludeAttributes: number[];
   minAttrRequirements?: Record<number, number>;
   useGpu?: boolean;
+  minModuleScore?: number;
 };
 
 export type ModuleCalcProgressPayload = [number, number]; // [processed, total]

@@ -45,8 +45,8 @@ extern "C" int GpuStrategyEnumeration(
     long long* result_indices);
 #endif
 
-inline bool NextCombination(std::array<uint16_t, 4>& comb, size_t n) {
-    const size_t r = 4;
+inline bool NextCombination(std::array<uint16_t, 5>& comb, size_t n) {
+    const size_t r = 5;
     for (int pos = static_cast<int>(r) - 1; pos >= 0; --pos) {
         uint16_t limit = static_cast<uint16_t>(n - r + pos);
         if (comb[pos] < limit) {
@@ -103,11 +103,11 @@ std::vector<CompactSolution> ModuleOptimizerCpp::ProcessCombinationRange(
     solution.reserve(std::min(range_size, static_cast<size_t>(local_top_capacity + ext_space)));
     int current_min = std::numeric_limits<int>::min();
 
-    thread_local std::array<uint16_t, 4> combination_buffer;
-    thread_local std::vector<size_t> temp_combination(4);
+    thread_local std::array<uint16_t, 5> combination_buffer;
+    thread_local std::vector<size_t> temp_combination(5);
 
-    GetCombinationByIndex(n, 4, start_combination, temp_combination);
-    for (size_t j = 0; j < 4; ++j) {
+    GetCombinationByIndex(n, 5, start_combination, temp_combination);
+    for (size_t j = 0; j < 5; ++j) {
         combination_buffer[j] = static_cast<uint16_t>(temp_combination[j]);
     }
 
@@ -129,28 +129,19 @@ std::vector<CompactSolution> ModuleOptimizerCpp::ProcessCombinationRange(
                 if (got_sum < need_sum) { ok = false; break; }
             }
             if (ok) {
-                uint64_t packed = 0;
-                for (size_t i = 0; i < 4; ++i) {
-                    packed |= (static_cast<uint64_t>(combination_buffer[i]) << (i * 16));
-                }
-                int score = CalculateCombatPowerByPackedIndices(packed, modules, target_attributes, exclude_attributes);
+                CompactSolution cs(combination_buffer, 0);
+                cs.score = CalculateCombatPowerByCompactSolution(cs, modules, target_attributes, exclude_attributes);
 
                 if (static_cast<int>(solution.size()) < local_top_capacity) {
                     // 小于local_top_capacity无脑入栈并记录最小值
-                    CompactSolution cs; 
-                    cs.packed_indices = packed; 
-                    cs.score = score;
                     solution.emplace_back(cs);
                     if (static_cast<int>(solution.size()) == local_top_capacity) {
                         int mn = solution[0].score;
                         for (int i = 1; i < local_top_capacity; ++i) mn = std::min(mn, solution[i].score);
                         current_min = mn;
                     }
-                } else if (score > current_min) {
+                } else if (cs.score > current_min) {
                     // 在local_top_capacity-ext_space期间比在local_top_capacity内分高的才入栈
-                    CompactSolution cs; 
-                    cs.packed_indices = packed; 
-                    cs.score = score; 
                     solution.emplace_back(cs);
                     if (static_cast<int>(solution.size()) == local_top_capacity + ext_space) {
                         // 保持local_top_capacity为TOP
@@ -165,21 +156,18 @@ std::vector<CompactSolution> ModuleOptimizerCpp::ProcessCombinationRange(
                 }
             }
         } else {
-            uint64_t packed = 0;
-            for (size_t i = 0; i < 4; ++i) {
-                packed |= (static_cast<uint64_t>(combination_buffer[i]) << (i * 16));
-            }
-            int score = CalculateCombatPowerByPackedIndices(packed, modules, target_attributes, exclude_attributes);
+            CompactSolution cs(combination_buffer, 0);
+            cs.score = CalculateCombatPowerByCompactSolution(cs, modules, target_attributes, exclude_attributes);
 
             if (static_cast<int>(solution.size()) < local_top_capacity) {
-                CompactSolution cs; cs.packed_indices = packed; cs.score = score; solution.emplace_back(cs);
+                solution.emplace_back(cs);
                 if (static_cast<int>(solution.size()) == local_top_capacity) {
                     int mn = solution[0].score;
                     for (int i = 1; i < local_top_capacity; ++i) mn = std::min(mn, solution[i].score);
                     current_min = mn;
                 }
-            } else if (score > current_min) {
-                CompactSolution cs; cs.packed_indices = packed; cs.score = score; solution.emplace_back(cs);
+            } else if (cs.score > current_min) {
+                solution.emplace_back(cs);
                 if (static_cast<int>(solution.size()) == local_top_capacity + ext_space) {
                     std::nth_element(solution.begin(), solution.begin() + local_top_capacity, solution.end(),
                         [](const CompactSolution& a, const CompactSolution& b){ return a.score > b.score; });
@@ -247,7 +235,7 @@ std::pair<int, std::map<std::string, int>> ModuleOptimizerCpp::CalculateCombatPo
             }
         }
         
-        int total_attr_power = total_attr_power = Constants::TOTAL_ATTR_POWER_VALUES[total_attr_value];
+        int total_attr_power = Constants::TOTAL_ATTR_POWER_VALUES[total_attr_value];
         
         int total_power = threshold_power + total_attr_power;
         
@@ -332,25 +320,21 @@ int ModuleOptimizerCpp::CalculateCombatPowerByIndices(
     return threshold_power + total_attr_power;
 }
 
-int ModuleOptimizerCpp::CalculateCombatPowerByPackedIndices(
-    uint64_t packed_indices,
+int ModuleOptimizerCpp::CalculateCombatPowerByCompactSolution(
+    const CompactSolution& compact_solution,
     const std::vector<ModuleInfo>& modules,
     const std::unordered_set<int>& target_attributes,
     const std::unordered_set<int>& exclude_attributes) {
     
-    // 解包索引
-    std::array<uint16_t, 4> indices;
-    for (size_t i = 0; i < 4; ++i) {
-        indices[i] = static_cast<uint16_t>((packed_indices >> (i * 16)) & 0xFFFF);
-    }
+    const auto& indices = compact_solution.indices;
     
-    std::array<int, 20> attr_values = {};
-    std::array<int, 20> attr_ids;
+    std::array<int, 25> attr_values = {};
+    std::array<int, 25> attr_ids;
     size_t attr_count = 0;
     
     int total_attr_value = 0;
     
-    for (size_t idx_pos = 0; idx_pos < 4; ++idx_pos) {
+    for (size_t idx_pos = 0; idx_pos < 5; ++idx_pos) {
         size_t index = static_cast<size_t>(indices[idx_pos]);
         
         const auto& module = modules[index];
@@ -362,7 +346,7 @@ int ModuleOptimizerCpp::CalculateCombatPowerByPackedIndices(
                     break;
                 }
             }
-            if (i == attr_count && attr_count < 20) {
+            if (i == attr_count && attr_count < 25) {
                 attr_ids[attr_count] = part.id;
                 attr_values[attr_count] = part.value;
                 ++attr_count;
