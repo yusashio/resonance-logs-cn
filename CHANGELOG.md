@@ -1,6 +1,6 @@
 # Changelog yusa version v0.1.0
 
-### v0.1.0 - 战斗属性监控系统
+### v0.1.0 - resonance-logs-cn-yusa
 
 #### 新功能
 - **Game Overlay 重构**
