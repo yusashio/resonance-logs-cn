@@ -3936,7 +3936,7 @@ dependencies = [
 
 [[package]]
 name = "resonance-logs-cn"
-version = "0.0.5"
+version = "0.1.0"
 dependencies = [
  "bincode",
  "blueprotobuf-lib",
