@@ -89,6 +89,7 @@ export type OverlayPositions = {
   textBuffPanel: Point;
   specialBuffGroup: Point;
   attrPanel: Point;
+  monsterHealthPanel: Point;
   iconBuffPositions: Record<number, Point>;
 };
 
@@ -97,6 +98,7 @@ export type OverlaySizes = {
   resourceGroupScale: number;
   textBuffPanelScale: number;
   attrPanelScale: number;
+  monsterHealthPanelScale: number;
   iconBuffSizes: Record<number, number>;
 };
 
@@ -159,6 +161,7 @@ function createDefaultOverlayPositions(): OverlayPositions {
     textBuffPanel: { x: 360, y: 40 },
     specialBuffGroup: { x: 360, y: 220 },
     attrPanel: { x: 40, y: 310 },
+    monsterHealthPanel: { x: 40, y: 450 },
     iconBuffPositions: {},
   };
 }
@@ -169,6 +172,7 @@ function createDefaultOverlaySizes(): OverlaySizes {
     resourceGroupScale: 1,
     textBuffPanelScale: 1,
     attrPanelScale: 1,
+    monsterHealthPanelScale: 1,
     iconBuffSizes: {},
   };
 }
@@ -471,6 +475,7 @@ const DEFAULT_SETTINGS = {
     hardReset: "",
     toggleBossHp: "",
     toggleOverlayEdit: "",
+    toggleOverlayWindow: "",
   },
   moduleSync: {
     enabled: false,

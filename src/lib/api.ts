@@ -178,6 +178,15 @@ export type DamageEvent = {
   isKillingBlow: boolean;
 };
 
+export type MonsterStats = {
+  targetId: number;
+  targetName: string | null;
+  targetMonsterTypeId: number | null;
+  isBoss: boolean;
+  hitCount: number;
+  totalDamage: number;
+};
+
 export type Segment = {
   id: number;
   segmentType: 'boss' | 'trash';
@@ -189,6 +198,7 @@ export type Segment = {
   totalDamage: number;
   hitCount: number;
   events: DamageEvent[];
+  monsterStats: MonsterStats[];
 };
 
 export type DungeonLog = {

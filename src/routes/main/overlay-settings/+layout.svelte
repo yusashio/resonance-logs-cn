@@ -9,10 +9,14 @@
   import SettingsIcon from "virtual:icons/lucide/settings";
   import SwordIcon from "virtual:icons/lucide/sword";
   import ShieldIcon from "virtual:icons/lucide/shield";
+  import HeartIcon from "virtual:icons/lucide/heart";
+  import KeyboardIcon from "virtual:icons/lucide/keyboard";
   import FlaskIcon from "virtual:icons/lucide/flask-conical";
   import BasicSettings from "./components/BasicSettings.svelte";
   import SkillSettings from "./components/SkillSettings.svelte";
   import BuffSettings from "./components/BuffSettings.svelte";
+  import MonsterHpSettings from "./components/MonsterHpSettings.svelte";
+  import ShortcutSettings from "./components/ShortcutSettings.svelte";
   import TestSettings from "./components/TestSettings.svelte";
   import { SETTINGS } from "$lib/settings-store";
 
@@ -20,12 +24,19 @@
 
   let activeTab = $state("basic");
 
-  const tabs = [
+  const baseTabs = [
     { id: "basic", label: "基础设置", icon: SettingsIcon },
     { id: "skills", label: "技能设置", icon: SwordIcon },
     { id: "buffs", label: "Buff 设置", icon: ShieldIcon },
+    { id: "monsterHp", label: "怪物血量", icon: HeartIcon },
+    { id: "shortcuts", label: "快捷键", icon: KeyboardIcon },
+  ];
+
+  const devTabs = [
     { id: "test", label: "测试面板", icon: FlaskIcon },
   ];
+
+  const tabs = import.meta.env.DEV ? [...baseTabs, ...devTabs] : baseTabs;
 
   function handleTabChange(tabId: string): void {
     activeTab = tabId;
@@ -117,7 +128,11 @@
       <SkillSettings />
     {:else if activeTab === "buffs"}
       <BuffSettings />
-    {:else if activeTab === "test"}
+    {:else if activeTab === "monsterHp"}
+      <MonsterHpSettings />
+    {:else if activeTab === "shortcuts"}
+      <ShortcutSettings />
+    {:else if activeTab === "test" && import.meta.env.DEV}
       <TestSettings />
     {/if}
   </div>

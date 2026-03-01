@@ -27,6 +27,7 @@
     findSpecialBuffDisplays,
   } from "$lib/skill-mappings";
   import AttrPanel from "./components/AttrPanel.svelte";
+  import MonsterHealthPanel from "./components/MonsterHealthPanel.svelte";
 
   type SkillDisplay = {
     isActive: boolean;
@@ -94,6 +95,7 @@
     textBuffPanel: { x: 360, y: 40 },
     specialBuffGroup: { x: 360, y: 220 },
     attrPanel: { x: 40, y: 310 },
+    monsterHealthPanel: { x: 40, y: 450 },
     iconBuffPositions: {},
   };
   const DEFAULT_OVERLAY_SIZES: OverlaySizes = {
@@ -101,6 +103,7 @@
     resourceGroupScale: 1,
     textBuffPanelScale: 1,
     attrPanelScale: 1,
+    monsterHealthPanelScale: 1,
     iconBuffSizes: {},
   };
   const DEFAULT_OVERLAY_VISIBILITY: OverlayVisibility = {
@@ -183,6 +186,7 @@
       textBuffPanel: current?.textBuffPanel ?? DEFAULT_OVERLAY_POSITIONS.textBuffPanel,
       specialBuffGroup: current?.specialBuffGroup ?? DEFAULT_OVERLAY_POSITIONS.specialBuffGroup,
       attrPanel: current?.attrPanel ?? DEFAULT_OVERLAY_POSITIONS.attrPanel,
+      monsterHealthPanel: current?.monsterHealthPanel ?? DEFAULT_OVERLAY_POSITIONS.monsterHealthPanel,
       iconBuffPositions: current?.iconBuffPositions ?? {},
     };
   }
@@ -198,6 +202,8 @@
         current?.textBuffPanelScale ?? DEFAULT_OVERLAY_SIZES.textBuffPanelScale,
       attrPanelScale:
         current?.attrPanelScale ?? DEFAULT_OVERLAY_SIZES.attrPanelScale,
+      monsterHealthPanelScale:
+        current?.monsterHealthPanelScale ?? DEFAULT_OVERLAY_SIZES.monsterHealthPanelScale,
       iconBuffSizes: current?.iconBuffSizes ?? {},
     };
   }
@@ -1056,6 +1062,30 @@
     </div>
   {/if}
 
+  {#if SETTINGS.live.headerCustomization.state.showBossHealth}
+    <div
+      class="overlay-group monster-health-panel-group"
+      class:editable={isEditing}
+      style:left={`${getGroupPosition("monsterHealthPanel").x}px`}
+      style:top={`${getGroupPosition("monsterHealthPanel").y}px`}
+      style:transform={`scale(${getGroupScale("monsterHealthPanelScale")})`}
+      style:transform-origin="top left"
+      onpointerdown={(e) => startDrag(e, { kind: "group", key: "monsterHealthPanel" }, getGroupPosition("monsterHealthPanel"))}
+    >
+      {#if isEditing}
+        <div class="group-tag">怪物血量</div>
+      {/if}
+      <MonsterHealthPanel />
+      {#if isEditing}
+        <div
+          class="resize-handle"
+          onpointerdown={(e) =>
+            startResize(e, { kind: "group", key: "monsterHealthPanelScale" }, getGroupScale("monsterHealthPanelScale"))}
+        ></div>
+      {/if}
+    </div>
+  {/if}
+
   {#if SETTINGS.skillMonitor.state.enableTextBuff && limitedTextBuffs.length > 0}
     <div
       class="overlay-group text-buff-panel"
@@ -1415,6 +1445,7 @@
   .skill-group.editable,
   .resource-group.editable,
   .attr-panel-group.editable,
+  .monster-health-panel-group.editable,
   .text-buff-panel.editable {
     border: 2px solid rgba(102, 204, 255, 0.9);
     border-radius: 10px;

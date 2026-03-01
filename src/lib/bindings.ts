@@ -645,6 +645,14 @@ export type HistoryEntityData = { uid: number; name: string; classId: number; cl
 export type ModuleInfo = { name: string; config_id: number; uuid: number; quality: number; parts: ModulePart[] }
 export type ModulePart = { id: number; name: string; value: number }
 export type ModuleSolution = { modules: ModuleInfo[]; score: number; attr_breakdown: Partial<{ [key in string]: number }> }
+/**
+ * 敌人统计数据 - 按目标ID聚合的伤害统计
+ */
+export type MonsterStats = { targetId: number; targetName: string | null; targetMonsterTypeId: number | null; isBoss: boolean; hitCount: number; totalDamage: number; 
+/**
+ * 最后一次被攻击的时间戳（毫秒）
+ */
+lastHitAtMs: number }
 export type PerTargetStats = { targetUid: number; targetName: string; totalValue: number; damage: RawCombatStats; skills: Partial<{ [key in number]: RawSkillStats }> }
 /**
  * The result of a query for player names.
@@ -683,7 +691,11 @@ export type Segment = { id: number; segmentType: SegmentType;
 /**
  * Primary boss entity ID (first one seen) - kept for backwards compatibility
  */
-bossEntityId: number | null; bossMonsterTypeId: number | null; bossName: string | null; startedAtMs: number; endedAtMs: number | null; totalDamage: number; hitCount: number; events: DamageEvent[] }
+bossEntityId: number | null; bossMonsterTypeId: number | null; bossName: string | null; startedAtMs: number; endedAtMs: number | null; totalDamage: number; hitCount: number; events: DamageEvent[]; 
+/**
+ * 按敌人ID聚合的统计数据
+ */
+monsterStats: MonsterStats[] }
 export type SegmentType = "boss" | "trash"
 
 /** tauri-specta globals **/

@@ -859,6 +859,7 @@ impl Entity {
     /// Determine whether this entity is a boss based on game data categorization.
     /// Uses MONSTER_NAMES_BOSS which contains IDs marked as main_category == "boss"
     /// in the game's quest log data.
+    /// 优化检测顺序，优先使用更早到达的数据以减少延迟
     pub fn is_boss(&self) -> bool {
         if self.entity_type != EEntityType::EntMonster {
             return false;
@@ -874,23 +875,14 @@ impl Entity {
             }
         }
 
-        // Check if monster_type_id exists in the boss list
-        if self
-            .monster_type_id
-            .map(|id| MONSTER_NAMES_BOSS.contains_key(&id.to_string()))
-            .unwrap_or(false)
-        {
-            return true;
-        }
-
-        // If not identified by ID, check for 'Boss' text in the raw packet name
+        // 优先检查包名称是否包含 "Boss"（这个通常最早到达）
         if let Some(packet_name) = &self.monster_name_packet {
             if packet_name.to_lowercase().contains("boss") {
                 return true;
             }
         }
 
-        // Fallback: if ATTR_ELITE_STATUS is present and non-zero, consider it a boss
+        // 检查 ATTR_ELITE_STATUS 属性（这个也相对较早）
         if let Some(elite_status) = self
             .attributes
             .get(&AttrType::EliteStatus)
@@ -899,6 +891,15 @@ impl Entity {
             if elite_status > 0 {
                 return true;
             }
+        }
+
+        // 最后检查 monster_type_id 是否在 boss 列表中（这个可能延迟）
+        if self
+            .monster_type_id
+            .map(|id| MONSTER_NAMES_BOSS.contains_key(&id.to_string()))
+            .unwrap_or(false)
+        {
+            return true;
         }
 
         false

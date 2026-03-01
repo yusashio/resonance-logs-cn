@@ -101,6 +101,14 @@
         label="属性监控"
         description="实时推送角色属性数据到悬浮窗口"
       />
+      <SettingsSwitch
+        checked={SETTINGS.live.headerCustomization.state.showBossHealth}
+        onchange={(e) => {
+          SETTINGS.live.headerCustomization.state.showBossHealth = (e.currentTarget as HTMLInputElement).checked;
+        }}
+        label="怪物血量"
+        description="实时显示当前战斗中的怪物血量信息"
+      />
     </div>
   </div>
 
